@@ -1,0 +1,890 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Job Entry | Harinam Paper</title>
+    <style>
+        :root {
+            --bg: #f7f9fc;
+            --card: #ffffff;
+            --line: #d9e1ee;
+            --text: #0f1f3d;
+            --muted: #667393;
+            --blue: #0b67f0;
+            --purple: #7d32b8;
+            --green: #078f35;
+            --green-bg: #eaf7ea;
+            --shadow: 0 8px 22px rgba(20, 38, 74, 0.07);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 12px;
+        }
+
+        button,
+        input,
+        select,
+        textarea {
+            font: inherit;
+        }
+
+        .page {
+            width: min(100%, 1920px);
+            margin: 0 auto;
+            padding: 8px;
+        }
+
+        .topbar,
+        .panel,
+        .summary {
+            background: var(--card);
+            border: 1px solid #e4e9f2;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 8px;
+            padding: 10px 14px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 240px;
+        }
+
+        .brand-icon,
+        .section-icon {
+            display: inline-grid;
+            place-items: center;
+            flex: 0 0 auto;
+        }
+
+        .brand-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            background: #e9fbff;
+            color: var(--blue);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 20px;
+            line-height: 1.1;
+            letter-spacing: 0;
+        }
+
+        .subtitle {
+            margin-top: 4px;
+            color: #536281;
+            font-size: 12px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            min-width: 88px;
+            height: 36px;
+            border: 1px solid var(--line);
+            border-radius: 7px;
+            background: #fff;
+            color: #0f1f3d;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .btn-primary {
+            border-color: var(--blue);
+            background: var(--blue);
+            color: #fff;
+        }
+
+        .messages {
+            display: grid;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        .message {
+            padding: 9px 12px;
+            border-radius: 7px;
+            border: 1px solid var(--line);
+            background: #fff;
+            font-weight: 700;
+        }
+
+        .message.success {
+            border-color: #bfe5c6;
+            background: #eaf7ea;
+            color: var(--green);
+        }
+
+        .message.error {
+            border-color: #f0c2c2;
+            background: #fff0f0;
+            color: #bd2424;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: minmax(250px, 0.72fr) minmax(620px, 1.85fr) minmax(260px, 0.78fr);
+            gap: 8px;
+            align-items: start;
+        }
+
+        .panel {
+            padding: 14px;
+            min-height: 0;
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            color: var(--blue);
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .section-title.paper {
+            color: var(--purple);
+        }
+
+        .field-stack {
+            display: grid;
+            gap: 12px;
+        }
+
+        .field,
+        .inline-field,
+        .split-field,
+        .money-field,
+        .amount-card {
+            border: 1px solid var(--line);
+            border-radius: 7px;
+            background: #fff;
+            overflow: hidden;
+        }
+
+        .field label,
+        .inline-field label,
+        .split-label,
+        .money-label {
+            display: block;
+            min-height: 31px;
+            padding: 9px 10px 7px;
+            color: #061733;
+            font-weight: 700;
+        }
+
+        .field input,
+        .field select,
+        .inline-field input,
+        .inline-field select,
+        .split-field input,
+        .split-field select,
+        .money-field input,
+        .money-field select {
+            width: 100%;
+            min-height: 32px;
+            border: 0;
+            border-top: 1px solid var(--line);
+            padding: 8px 10px;
+            color: var(--text);
+            outline: none;
+        }
+
+        input::placeholder,
+        textarea::placeholder {
+            color: #64708e;
+        }
+
+        .input-row {
+            display: grid;
+            grid-template-columns: 1fr 64px;
+        }
+
+        .input-row > * + * {
+            border-left: 1px solid var(--line) !important;
+        }
+
+        .inline-field {
+            display: grid;
+            grid-template-columns: 116px 1fr;
+        }
+
+        .inline-field.compact {
+            grid-template-columns: 92px 1fr;
+        }
+
+        .inline-field label {
+            border-right: 1px solid var(--line);
+        }
+
+        .inline-field input,
+        .inline-field select {
+            border-top: 0;
+        }
+
+        .inline-field .input-row {
+            grid-template-columns: 1fr 64px;
+        }
+
+        .date-wrap {
+            position: relative;
+        }
+
+        .date-wrap svg {
+            position: absolute;
+            right: 10px;
+            bottom: 8px;
+            color: #0f1f3d;
+            pointer-events: none;
+        }
+
+        .job-items {
+            display: grid;
+            gap: 12px;
+            margin-top: 54px;
+        }
+
+        .job-head {
+            display: grid;
+            grid-template-columns: 1fr 0.95fr;
+            gap: 12px;
+        }
+
+        .job-row {
+            display: grid;
+            grid-template-columns: minmax(190px, 0.78fr) 24px minmax(150px, 0.58fr) minmax(230px, 0.88fr);
+            column-gap: 10px;
+            row-gap: 12px;
+            align-items: center;
+            justify-content: start;
+        }
+
+        .split-field {
+            display: grid;
+            grid-template-columns: 0.95fr 1fr;
+        }
+
+        .split-field.with-qty {
+            grid-template-columns: 0.86fr 0.52fr 0.82fr;
+        }
+
+        .split-field > * + * {
+            border-left: 1px solid var(--line);
+        }
+
+        .split-field input,
+        .split-field select {
+            border-top: 0;
+        }
+
+        .qty-label {
+            display: block;
+            min-height: 31px;
+            padding: 9px 10px 7px;
+            color: #061733;
+            font-weight: 700;
+        }
+
+        .multiply-label {
+            display: grid;
+            place-items: center;
+            min-height: 31px;
+            color: #061733;
+            font-weight: 800;
+        }
+
+        .money-field {
+            display: grid;
+            grid-template-columns: 36px 1fr;
+        }
+
+        .money-label {
+            border-right: 1px solid var(--line);
+            min-height: 34px;
+        }
+
+        .money-field input {
+            border-top: 0;
+            text-align: right;
+        }
+
+        .amount-card {
+            display: grid;
+            grid-template-columns: 116px minmax(92px, 1fr);
+            min-height: 34px;
+            padding: 0;
+            text-align: left;
+        }
+
+        .amount-card span {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0;
+            padding: 8px 10px;
+            color: #061733;
+            font-weight: 700;
+            border-right: 1px solid var(--line);
+            white-space: nowrap;
+        }
+
+        .amount-card input {
+            width: 100%;
+            min-height: 32px;
+            border: 0;
+            padding: 8px 10px;
+            outline: none;
+            text-align: right;
+            color: var(--green);
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: 0;
+            background: #fff;
+        }
+
+        .paper-stack {
+            display: grid;
+            gap: 10px;
+        }
+
+        .paper-money {
+            display: grid;
+            grid-template-columns: 82px 42px 1fr;
+            border: 1px solid var(--line);
+            border-radius: 7px;
+            overflow: hidden;
+        }
+
+        .paper-money label,
+        .paper-money span,
+        .paper-money input {
+            min-height: 32px;
+            padding: 8px 9px;
+            background: #fff;
+        }
+
+        .paper-money label,
+        .paper-money span {
+            color: #061733;
+            font-weight: 700;
+        }
+
+        .paper-money > * + * {
+            border-left: 1px solid var(--line);
+        }
+
+        .paper-money input {
+            width: 100%;
+            border: 0;
+            outline: none;
+        }
+
+        .summary {
+            margin-top: 8px;
+            padding: 12px 18px 16px;
+        }
+
+        .summary-title {
+            margin-bottom: 8px;
+            color: var(--blue);
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .total-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 28px;
+            margin-bottom: 8px;
+            padding: 0 12px;
+            border-radius: 6px;
+            background: var(--green-bg);
+            color: var(--green);
+            font-weight: 800;
+        }
+
+        .summary-total {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            min-height: 34px;
+            margin-bottom: 8px;
+            overflow: hidden;
+            border-radius: 6px;
+            background: var(--green-bg);
+            color: var(--green);
+            font-weight: 800;
+        }
+
+        .summary-total span,
+        .summary-total strong {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+        }
+
+        .summary-total span {
+            border-right: 1px solid #cbe9cf;
+        }
+
+        .summary-total input {
+            width: 100%;
+            min-height: 34px;
+            border: 0;
+            outline: none;
+            background: var(--green-bg);
+            color: var(--green);
+            text-align: right;
+            font-size: 16px;
+            font-weight: 800;
+            padding: 8px 12px;
+        }
+
+        .summary-total strong {
+            justify-content: flex-end;
+            font-size: 16px;
+        }
+
+        .total-bar strong {
+            font-size: 16px;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: minmax(260px, 0.86fr) minmax(280px, 1fr) minmax(280px, 0.92fr) minmax(260px, 0.86fr);
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .summary-grid .paper-money {
+            grid-template-columns: 104px 42px 1fr;
+        }
+
+        .summary-grid .paper-money label {
+            white-space: nowrap;
+        }
+
+        .remarks label {
+            display: block;
+            margin-bottom: 6px;
+            color: #061733;
+            font-weight: 700;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 46px;
+            resize: vertical;
+            border: 1px solid var(--line);
+            border-radius: 7px;
+            padding: 9px;
+            outline: none;
+        }
+
+        svg {
+            width: 18px;
+            height: 18px;
+            stroke-width: 2;
+        }
+
+        @media (max-width: 1200px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .panel {
+                min-height: auto;
+            }
+
+            .summary-grid,
+            .job-row {
+                grid-template-columns: 1fr 24px 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .job-head,
+            .summary-grid,
+            .job-row {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .amount-card {
+                grid-column: span 2;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .page {
+                padding: 8px;
+            }
+
+            .topbar,
+            .summary {
+                padding: 12px;
+            }
+
+            .topbar,
+            .actions,
+            .job-head,
+            .job-row,
+            .summary-grid {
+                grid-template-columns: 1fr;
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .panel {
+                padding: 12px;
+            }
+
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <header class="topbar">
+            <div class="brand">
+                <span class="brand-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
+                </span>
+                <div>
+                    <h1>Job Entry</h1>
+                    <div class="subtitle">Enter job details for printing</div>
+                </div>
+            </div>
+            <div class="actions">
+                <button class="btn" type="button" id="reset-page">Reset</button>
+                <button class="btn btn-primary" type="submit" form="job-entry-form">Save Job</button>
+            </div>
+        </header>
+
+        <form id="job-entry-form" method="post">
+            {% csrf_token %}
+            {% if messages %}
+                <div class="messages">
+                    {% for message in messages %}
+                        <div class="message {{ message.tags }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            <section class="main-grid">
+                <div class="panel">
+                    <div class="section-title">
+                        <span class="section-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 4h12v17H6z"/><path d="M9 4V2h6v2"/><path d="M9 11h6"/><path d="M12 8v6"/></svg></span>
+                        Job Information
+                    </div>
+                    <div class="field-stack">
+                        <div class="inline-field">
+                            <label for="job_no">Job No</label>
+                            <input id="job_no" name="job_no" value="{{ next_job_no }}" readonly>
+                        </div>
+                        <div class="inline-field date-wrap">
+                            <label for="job_date">Date</label>
+                            <input id="job_date" name="job_date" type="date">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                        </div>
+
+                        <div class="inline-field">
+                            <label for="copies">Copies</label>
+                            <div class="input-row">
+                                <input id="copies" name="copies" placeholder="No. of Copies">
+                            </div>
+                        </div>
+                        <div class="inline-field">
+                            <label for="ink">Ink</label>
+                            <div class="input-row">
+                                <input id="ink" name="ink" placeholder="ink name">
+                            </div>
+                        </div>
+                        <div class="inline-field">
+                            <label for="customer_name">PTQ</label>
+                            <input id="customer_name" name="customer_name" placeholder="ptq">
+                        </div>
+
+                        <div class="inline-field">
+                            <label for="binding_type">Binding Type</label>
+                            <select id="binding_type" name="binding_type">
+                                <option value="">Select Binding Type</option>
+                                {% for binding_type in binding_types %}
+                                    <option value="{{ binding_type.name }}">{{ binding_type.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="section-title">
+                        <span class="section-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16h16V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-5"/></svg></span>
+                        Job Items
+                    </div>
+                    <div class="job-items">
+                        <div class="job-head">
+                            <div class="inline-field compact">
+                                <label for="item_name">Name</label>
+                                <input id="item_name" name="item_name" placeholder="Name">
+                            </div>
+                            <div class="inline-field compact">
+                                <label for="item_size">Size</label>
+                                <div class="input-row">
+                                    <input id="item_size" name="item_size" placeholder="Size">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="job-row">
+                            <div class="split-field with-qty">
+                                <label class="split-label" for="page">Page</label>
+                                <span class="qty-label">Qty</span>
+                                <input id="page" name="page" value="0" data-qty-field>
+                            </div>
+                            <span class="multiply-label">*</span>
+                            <div class="money-field">
+                                <label class="money-label" for="page_amount">Rs</label>
+                                <input id="page_amount" name="page_amount" value="0" data-rate-field>
+                            </div>
+                            <div class="amount-card">
+                                <span>Total Amount</span>
+                                <input name="page_total_amount" value="0" readonly data-total-field>
+                            </div>
+                        </div>
+
+                        <div class="job-row">
+                            <div class="split-field with-qty">
+                                <label class="split-label" for="plates">Plates</label>
+                                <span class="qty-label">Qty</span>
+                                <input id="plates" name="plates" value="0" data-qty-field>
+                            </div>
+                            <span class="multiply-label">*</span>
+                            <div class="money-field">
+                                <label class="money-label" for="plates_amount">Rs</label>
+                                <input id="plates_amount" name="plates_amount" value="0" data-rate-field>
+                            </div>
+                            <div class="amount-card">
+                                <span>Total Amount</span>
+                                <input name="plates_total_amount" value="0" readonly data-total-field>
+                            </div>
+                        </div>
+
+                        <div class="job-row">
+                            <div class="split-field">
+                                <label class="split-label" for="qty">QTY</label>
+                                <input id="qty" name="qty" value="0" data-qty-field>
+                            </div>
+                            <span class="multiply-label">*</span>
+                            <div class="money-field">
+                                <label class="money-label" for="qty_amount">Rs</label>
+                                <input id="qty_amount" name="qty_amount" value="0" data-rate-field>
+                            </div>
+                            <div class="amount-card">
+                                <span>Total Amount</span>
+                                <input name="qty_total_amount" value="0" readonly data-total-field>
+                            </div>
+                        </div>
+
+                        <div class="job-row">
+                            <div class="split-field">
+                                <label class="split-label" for="other_name">Other Name</label>
+                                <input id="other_name" name="other_name" placeholder="Enter Name">
+                            </div>
+                            <span></span>
+                            <div class="money-field">
+                                <label class="money-label" for="other_amount">Rs</label>
+                                <input id="other_amount" name="other_amount" value="0" data-rate-field>
+                            </div>
+                            <div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="section-title paper">
+                        <span class="section-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v4h4"/><path d="M9 12h6M9 16h6M9 8h3"/></svg></span>
+                        Paper Detail
+                    </div>
+                    <div class="paper-stack">
+                        <div class="inline-field compact">
+                            <label for="sheets">Sheets</label>
+                            <div class="input-row">
+                                <input id="sheets" name="sheets" placeholder="Sheets">
+                            </div>
+                        </div>
+                        <div class="inline-field compact">
+                            <label for="paper_size">Size</label>
+                            <div class="input-row">
+                                <input id="paper_size" name="paper_size" placeholder="Size">
+                            </div>
+                        </div>
+                        <div class="inline-field compact">
+                            <label for="quality">Quality</label>
+                            <input id="quality" name="quality" placeholder="Quality Name">
+                        </div>
+                        <div class="inline-field compact">
+                            <label for="gsm">GSM</label>
+                            <div class="input-row">
+                                <input id="gsm" name="gsm" placeholder="GSM">
+                            </div>
+                        </div>
+                        <div class="inline-field compact">
+                            <label for="vendor">Vendor</label>
+                            <select id="vendor" name="vendor">
+                                <option value="">Vendor Name</option>
+                                {% for vendor in vendors %}
+                                    <option value="{{ vendor.name }}">{{ vendor.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="paper-money">
+                            <label for="paper_amount">Amount</label>
+                            <span>Rs</span>
+                            <input id="paper_amount" name="paper_amount" placeholder="Amount">
+                        </div>
+                        <div class="paper-money">
+                            <label for="lamination">Lamination</label>
+                            <span>Rs</span>
+                            <input id="lamination" name="lamination" placeholder="Amount">
+                        </div>
+                        <div class="paper-money">
+                            <label for="other_paper">Other</label>
+                            <span>Rs</span>
+                            <input id="other_paper" name="other_paper" placeholder="Amount">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="summary">
+                <div class="summary-title">Job Summary</div>
+                <div class="summary-total">
+                    <span>Total Amount</span>
+                    <input name="grand_total_amount" value="0" readonly id="grand_total_amount">
+                </div>
+                <div class="summary-grid">
+                    <div class="paper-money">
+                        <label for="paid_amount">Paid Amount</label>
+                        <span>Rs</span>
+                        <input id="paid_amount" name="paid_amount" value="0" readonly>
+                    </div>
+                    <div class="inline-field">
+                        <label for="received_by">Received By</label>
+                        <select id="received_by" name="received_by">
+                            <option>Name</option>
+                        </select>
+                    </div>
+                    <div class="inline-field date-wrap">
+                        <label for="paid_date">Date</label>
+                        <input id="paid_date" name="paid_date" type="date">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                    </div>
+                    <div class="inline-field">
+                        <label for="through">Through</label>
+                        <select id="through" name="through">
+                            <option value="">Select</option>
+                            {% for option in payment_through_options %}
+                                <option value="{{ option.name }}">{{ option.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </section>
+        </form>
+    </main>
+    <script>
+        (function () {
+            document.querySelectorAll("#job-entry-form input, #job-entry-form select").forEach(function (field) {
+                if (field.type !== "hidden" && !field.readOnly) {
+                    field.required = true;
+                }
+            });
+
+            var resetButton = document.getElementById("reset-page");
+            if (resetButton) {
+                resetButton.addEventListener("click", function () {
+                    window.location.href = window.location.pathname;
+                });
+            }
+
+            function numberValue(input) {
+                if (!input) {
+                    return 0;
+                }
+                var value = parseFloat(String(input.value).replace(/[^0-9.-]/g, ""));
+                return isNaN(value) ? 0 : value;
+            }
+
+            function formatAmount(value) {
+                return value ? value.toFixed(2) : "0";
+            }
+
+            function calculateTotals() {
+                var grandTotal = 0;
+
+                document.querySelectorAll(".job-row").forEach(function (row) {
+                    var qty = row.querySelector("[data-qty-field]");
+                    var rate = row.querySelector("[data-rate-field]");
+                    var total = row.querySelector("[data-total-field]");
+
+                    if (qty && rate && total) {
+                        var rowTotal = numberValue(qty) * numberValue(rate);
+                        total.value = formatAmount(rowTotal);
+                        grandTotal += rowTotal;
+                    } else if (rate) {
+                        grandTotal += numberValue(rate);
+                    }
+                });
+
+                ["paper_amount", "lamination", "other_paper"].forEach(function (id) {
+                    grandTotal += numberValue(document.getElementById(id));
+                });
+
+                var grandTotalInput = document.getElementById("grand_total_amount");
+                var paidAmountInput = document.getElementById("paid_amount");
+                var formatted = formatAmount(grandTotal);
+
+                if (grandTotalInput) {
+                    grandTotalInput.value = formatted;
+                }
+                if (paidAmountInput) {
+                    paidAmountInput.value = formatted;
+                }
+            }
+
+            document.querySelectorAll("[data-qty-field], [data-rate-field], #paper_amount, #lamination, #other_paper").forEach(function (input) {
+                input.addEventListener("input", calculateTotals);
+            });
+
+            calculateTotals();
+        }());
+    </script>
+</body>
+</html>
