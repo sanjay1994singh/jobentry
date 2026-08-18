@@ -1,0 +1,2090 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Printing Job Sheet</title>
+    <link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.css' %}">
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #f0f2f5;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            min-height: 100vh;
+            color: #1f2937;
+        }
+
+        .page-fluid {
+            width: 100%;
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .job-card {
+            border: 0;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, .07);
+            border-radius: 10px;
+            min-height: calc(100vh - 20px);
+            padding: 16px !important;
+        }
+
+        .header-title {
+            color: #1a365d;
+            font-weight: 700;
+            letter-spacing: .4px;
+            font-size: 1.55rem;
+        }
+
+        .section-banner {
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: .84rem;
+            letter-spacing: .7px;
+            padding: 7px 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            line-height: 1.2;
+        }
+
+        .banner-printing { background-color: #2563eb; color: #fff; }
+        .banner-paper { background-color: #059669; color: #fff; }
+        .banner-binding { background-color: #0d9488; color: #fff; }
+
+        /* ---------- Consistent form controls ---------- */
+        .input-group,
+        .input-group-sm {
+            width: 100%;
+            flex-wrap: nowrap;
+        }
+
+        .input-group-text,
+        .form-control,
+        .form-select {
+            min-height: 30px;
+            height: 30px;
+            border-color: #cbd5e1;
+            font-size: .78rem;
+            line-height: 1.15;
+        }
+
+        .input-group-text {
+            background-color: #e2e8f0;
+            color: #334155;
+            font-weight: 600;
+            padding: 4px 7px;
+            min-width: auto;
+            width: auto;
+            justify-content: center;
+            white-space: nowrap;
+            flex: 0 0 auto;
+        }
+
+        /* Very short labels such as Rs should not become unnecessarily wide */
+        .input-group-text.rs-label {
+            min-width: 38px !important;
+            width: 38px !important;
+            max-width: 38px !important;
+            padding-left: 6px !important;
+            padding-right: 6px !important;
+            flex: 0 0 auto;
+        }
+
+        .form-control,
+        .form-select {
+            padding: 4px 8px;
+            background-color: #fff;
+            font-size: .78rem !important;
+        }
+
+        input[type="text"],
+        textarea {
+            text-transform: uppercase;
+        }
+
+        .form-control::placeholder {
+            color: #64748b;
+            opacity: 1;
+        }
+
+        .form-control:not(.js-date-field)::placeholder {
+            color: transparent;
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 .12rem rgba(59, 130, 246, .15);
+        }
+
+        input[type="date"].form-control {
+            padding-top: 2px;
+            padding-bottom: 2px;
+        }
+
+        .symbol-txt {
+            min-width: 18px;
+            text-align: center;
+            font-weight: 700;
+            color: #64748b;
+            padding: 0 3px;
+            line-height: 30px;
+        }
+
+        /* ---------- Compact spacing ---------- */
+        .row {
+            --bs-gutter-x: 12px;
+        }
+
+        .row.g-1 {
+            --bs-gutter-x: 6px;
+            --bs-gutter-y: 6px;
+        }
+
+        .row.g-3 {
+            --bs-gutter-x: 12px;
+            --bs-gutter-y: 10px;
+        }
+
+        .main-columns-row {
+            display: grid;
+            grid-template-columns: 5fr 4fr 4fr;
+            gap: 24px;
+        }
+
+        .main-columns-row > [class*="col-"] {
+            width: 100%;
+            max-width: none;
+            padding-left: 0;
+            padding-right: 0;
+        }
+
+        .row.g-4 {
+            --bs-gutter-x: 14px;
+            --bs-gutter-y: 12px;
+        }
+
+        .form-block {
+            padding: 12px !important;
+        }
+
+        .form-row-gap {
+            margin-bottom: 10px !important;
+        }
+
+        .field-row {
+            margin-bottom: 7px !important;
+        }
+
+        .field-row:last-child {
+            margin-bottom: 0 !important;
+        }
+
+        /* printing row proportions */
+        .print-line {
+            width: 100%;
+        }
+
+        .print-line .input-group:first-child {
+            flex: 0 0 31%;
+        }
+
+        .print-line .input-group:nth-of-type(2) {
+            flex: 0 0 31%;
+        }
+
+        .print-line .total-group {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .print-line .symbol-txt {
+            display: inline-block;
+        }
+
+
+
+        /* ---------- PRINTING amount rows: fixed vertical alignment ---------- */
+        .printing-cost-row {
+            display: grid;
+            grid-template-columns: 110px calc(62% + 18px - 110px) 38px minmax(0, 1fr);
+            width: 100%;
+            align-items: stretch;
+        }
+
+        .printing-cost-row > .cost-label,
+        .printing-cost-row > .cost-rs,
+        .printing-cost-row > .form-control {
+            height: 30px;
+            min-height: 30px;
+            margin: 0;
+            border-color: #cbd5e1;
+        }
+
+        .printing-cost-row > .cost-label,
+        .printing-cost-row > .cost-rs {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #e2e8f0;
+            color: #334155;
+            font-weight: 600;
+            white-space: nowrap;
+            border: 1px solid #cbd5e1;
+        }
+
+        .printing-cost-row > .cost-label {
+            justify-content: flex-start;
+            padding: 4px 9px;
+            border-radius: .25rem 0 0 .25rem;
+        }
+
+        .printing-cost-row > .cost-details {
+            border-radius: 0;
+        }
+
+        .printing-cost-row > .cost-rs {
+            padding: 4px 6px;
+            border-left: 1px solid #cbd5e1;
+            border-right: 0;
+            border-radius: .25rem 0 0 .25rem;
+            margin-left: 0;
+            width: 38px;
+            min-width: 38px;
+            max-width: 38px;
+            font-size: .78rem;
+        }
+
+        .printing-cost-row > .cost-amount {
+            border-radius: 0 .25rem .25rem 0;
+            text-align: right;
+            border-left: 0;
+        }
+
+        /* TOTAL uses exactly the same Rs and amount columns as rows above */
+        .printing-cost-row.printing-total-row {
+            background-color: #f1f5f9;
+            border: 1px dashed #b8c6d8;
+            border-radius: .375rem;
+            padding: 3px;
+            grid-template-columns: 110px calc(62% + 18px - 110px) 38px minmax(0, 1fr);
+        }
+
+        .printing-total-row .total-caption {
+            grid-column: 1 / 3;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding: 3px 8px 3px 10px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .printing-total-row > .cost-rs,
+        .printing-total-row > .cost-amount {
+            height: 28px;
+            min-height: 28px;
+        }
+
+        @media (max-width: 575.98px) {
+            .printing-cost-row,
+            .printing-cost-row.printing-total-row {
+                grid-template-columns: 82px minmax(0, 1fr) 32px 105px;
+            }
+        }
+
+        .total-box {
+            background-color: #f1f5f9;
+            border: 1px dashed #b8c6d8;
+            padding: 3px !important;
+        }
+
+        .grand-total-box {
+            background-color: #fef9c3;
+            border: 1px solid #facc15;
+            padding: 3px !important;
+        }
+
+        .total-box .input-group-text,
+        .grand-total-box .input-group-text {
+            min-width: auto;
+            height: 28px;
+            min-height: 28px;
+            padding: 3px 8px;
+        }
+
+        .total-box .form-control,
+        .grand-total-box .form-control {
+            height: 28px;
+            min-height: 28px;
+        }
+
+        .summary-section {
+            padding: 10px !important;
+            margin-bottom: 12px !important;
+        }
+
+        .footer-actions {
+            gap: 6px !important;
+            padding-top: 8px !important;
+        }
+
+        .footer-actions .btn,
+        .footer-actions .form-control,
+        .footer-actions .input-group-text {
+            height: 30px;
+            min-height: 30px;
+            font-size: .75rem;
+        }
+
+        .footer-actions .btn {
+            padding-top: 4px;
+            padding-bottom: 4px;
+            border: 0;
+            color: #fff;
+            font-weight: 700;
+        }
+
+        #btn_system_value {
+            background: #64748b;
+            color: #fff;
+        }
+
+        #btn_search {
+            background: #2563eb;
+            color: #fff;
+        }
+
+        #btn_top {
+            background: #475569;
+        }
+
+        #btn_previous {
+            background: #7c3aed;
+        }
+
+        #btn_next {
+            background: #0f766e;
+        }
+
+        #btn_bottom {
+            background: #b45309;
+        }
+
+        #btn_list {
+            background: #1d4ed8;
+        }
+
+        #btn_options {
+            background: #9333ea;
+        }
+
+        #btn_new {
+            background: #15803d;
+        }
+
+        #btn_update {
+            background: #059669;
+        }
+
+        #btn_report {
+            background: #0891b2;
+        }
+
+        #btn_exit {
+            background: #dc2626;
+        }
+
+        .footer-actions .btn:hover {
+            filter: brightness(.94);
+        }
+
+        @media (max-width: 1199.98px) {
+        }
+
+        @media (max-width: 767.98px) {
+            .page-fluid {
+                padding: 6px;
+            }
+
+            .job-card {
+                padding: 10px !important;
+                min-height: calc(100vh - 12px);
+            }
+
+            .header-title {
+                font-size: 1.2rem;
+            }
+
+
+            .print-line {
+                flex-wrap: wrap !important;
+                gap: 5px;
+            }
+
+            .print-line .input-group:first-child,
+            .print-line .input-group:nth-of-type(2) {
+                flex: 1 1 calc(50% - 12px);
+            }
+
+            .print-line .total-group {
+                flex: 1 1 100%;
+            }
+
+            .symbol-txt {
+                min-width: 12px;
+                padding: 0;
+            }
+        }
+
+        /* Header details box */
+        .header-fields-box {
+            background: #f8fafc;
+            border: 1px solid #d7dee8;
+            border-radius: 9px;
+            padding: 12px;
+            width: 88%;
+            margin: 0 auto 14px;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, .03);
+        }
+
+        .header-fields-box .form-row-gap:last-child {
+            margin-bottom: 0 !important;
+        }
+
+        @media (max-width: 767.98px) {
+            .header-fields-box {
+                width: 100%;
+                padding: 9px;
+            }
+        }
+
+        .visually-hidden-form-label {
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            padding: 0 !important;
+            margin: -1px !important;
+            overflow: hidden !important;
+            clip: rect(0, 0, 0, 0) !important;
+            white-space: nowrap !important;
+            border: 0 !important;
+        }
+
+
+        .paper-blank-row {
+            width: 100%;
+            height: 30px;
+            min-height: 30px;
+        }
+
+
+        /* SYSTEM VALUE popup */
+        #systemValueModal .modal-dialog {
+            max-width: 470px;
+        }
+
+        #systemValueModal .modal-content {
+            border: 0;
+            border-radius: 10px;
+            box-shadow: 0 10px 35px rgba(0, 0, 0, .18);
+        }
+
+        #systemValueModal .modal-header {
+            padding: 10px 14px;
+            background: #1a365d;
+            color: #fff;
+            border-bottom: 0;
+        }
+
+        #systemValueModal .modal-title {
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: .3px;
+        }
+
+        #systemValueModal .btn-close {
+            filter: invert(1);
+            opacity: .9;
+        }
+
+        #systemValueModal .modal-body {
+            padding: 14px;
+        }
+
+        #systemValueModal .system-field {
+            margin-bottom: 9px;
+        }
+
+        #systemValueModal .system-field:last-child {
+            margin-bottom: 0;
+        }
+
+        #systemValueModal .input-group-text {
+            min-width: 105px;
+            padding-left: 7px;
+            padding-right: 7px;
+            justify-content: flex-start;
+        }
+
+        #systemValueModal .form-control {
+            min-width: 0;
+        }
+
+        #systemValueModal .modal-footer {
+            padding: 9px 14px;
+            gap: 6px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        #systemValueModal .modal-footer .btn {
+            min-width: 86px;
+        }
+
+
+        /* Separate balance strip: visually aligned under PRINTING, but not inside the 3-column layout */
+        .below-columns-summary {
+            display: grid;
+            grid-template-columns: 5fr 4fr 4fr; /* PRINTING | PAPER | BINDING proportions */
+            gap: 14px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .printing-side-summary {
+            grid-column: 1;
+            width: 100%;
+            max-width: 100%;
+            padding: 10px;
+            background: #f8fafc;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+        }
+
+        .printing-side-summary .balance-pair {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 10px;
+        }
+
+        .payment-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 8px;
+            width: 100%;
+        }
+
+        .payment-row .input-group {
+            min-width: 0;
+        }
+
+        .payment-row .form-control,
+        .payment-row .form-select {
+            min-width: 0;
+        }
+
+        .job-total-summary {
+            grid-column: 3; /* visually same position/width as third BINDING column */
+            width: 100%;
+            min-width: 0;
+            align-self: center;
+        }
+
+        .job-total-summary .grand-total-box {
+            width: 100%;
+        }
+
+        .job-total-summary .grand-total-box .input-group-text {
+            font-size: .78rem !important;
+            white-space: nowrap;
+            padding-left: 7px;
+            padding-right: 7px;
+        }
+
+        @media (max-width: 991.98px) {
+            .main-columns-row {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0;
+            }
+
+            .main-columns-row > [class*="col-"] {
+                padding-left: calc(var(--bs-gutter-x) * .5);
+                padding-right: calc(var(--bs-gutter-x) * .5);
+            }
+
+            .below-columns-summary {
+                display: block;
+            }
+
+            .printing-side-summary {
+                width: 100%;
+                max-width: 100%;
+            }
+
+            .job-total-summary {
+                margin-top: 10px;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .printing-side-summary .balance-pair {
+                grid-template-columns: 1fr;
+            }
+
+            .payment-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+
+        /* Header details: fixed 4-column alignment */
+        .header-details-box .row {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            margin-left: 0;
+            margin-right: 0;
+            width: 100%;
+        }
+
+        .header-details-box .row > [class*="col-"] {
+            width: auto;
+            max-width: none;
+            padding: 0;
+            min-width: 0;
+        }
+
+        .header-details-box .input-group {
+            width: 100%;
+            min-width: 0;
+        }
+
+        .header-details-box .input-group-text {
+            min-width: 62px;
+        }
+
+        /* Row 1: Job No | DATE | NAME (NAME spans columns 3+4) */
+        .header-details-box .header-row-1 > :nth-child(1) { grid-column: 1; }
+        .header-details-box .header-row-1 > :nth-child(2) { grid-column: 2; }
+        .header-details-box .header-row-1 > :nth-child(3) { grid-column: 3 / 5; }
+
+        /* Row 2: SIZE | PAGE | STYLE */
+        .header-details-box .header-row-2 > :nth-child(1) { grid-column: 1; }
+        .header-details-box .header-row-2 > :nth-child(2) { grid-column: 2; }
+        .header-details-box .header-row-2 > :nth-child(3) { grid-column: 3; }
+
+        /* Row 3: Copies | Ink | S/S F/B | Binder */
+        .header-details-box .header-row-3 > :nth-child(1) { grid-column: 1; }
+        .header-details-box .header-row-3 > :nth-child(2) { grid-column: 2; }
+        .header-details-box .header-row-3 > :nth-child(3) { grid-column: 3; }
+        .header-details-box .header-row-3 > :nth-child(4) { grid-column: 4; }
+
+        /* NAME and BINDER now end on the exact same right edge */
+        #job_name,
+        #job_binder,
+        #job_date {
+            min-width: 0;
+        }
+
+        @media (max-width: 991.98px) {
+            .header-details-box .row {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            .header-details-box .header-row-1 > :nth-child(1),
+            .header-details-box .header-row-1 > :nth-child(2),
+            .header-details-box .header-row-1 > :nth-child(3),
+            .header-details-box .header-row-2 > :nth-child(1),
+            .header-details-box .header-row-2 > :nth-child(2),
+            .header-details-box .header-row-2 > :nth-child(3),
+            .header-details-box .header-row-3 > :nth-child(1),
+            .header-details-box .header-row-3 > :nth-child(2),
+            .header-details-box .header-row-3 > :nth-child(3),
+            .header-details-box .header-row-3 > :nth-child(4) {
+                grid-column: auto;
+            }
+            .header-details-box .header-row-1 > :nth-child(3) {
+                grid-column: 1 / -1;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .header-details-box .row {
+                grid-template-columns: 1fr;
+            }
+            .header-details-box .header-row-1 > :nth-child(3) {
+                grid-column: auto;
+            }
+        }
+
+    </style>
+
+</head>
+<body>
+
+<div class="container-fluid page-fluid">
+    <form id="printing_job_form" name="printing_job_form" class="card job-card bg-white p-4" method="post" autocomplete="off">
+        {% csrf_token %}
+
+        {% if messages %}
+            <div class="mb-2">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags|default:'info' }} py-2 mb-2" role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <!-- Header Form Fields -->
+        <div class="header-fields-box">
+        <div class="header-details-box">
+<!-- ROW 1: NO, DATE, NAME -->
+        <div class="row g-3 form-row-gap header-row-1">
+            <div class="col-md-2">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text">Job No</span>
+                    <label for="job_job_no" class="visually-hidden-form-label">Job No</label>
+                    <input id="job_job_no" name="job_job_no" type="text" class="form-control fw-bold"
+                           value="{{ next_job_no }}" placeholder="Job No" readonly>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text">DATE</span>
+                    <label for="job_date" class="visually-hidden-form-label">Date</label>
+                    <input id="job_date" name="job_date" type="text" class="form-control js-date-field"
+                           value="{{ job_date_value }}"
+                           placeholder="dd-mm-yyyy">
+                </div>
+            </div>
+            <div class="col-md-7">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text">NAME</span>
+                    <label for="job_name" class="visually-hidden-form-label">Name</label>
+                    <input id="job_name" name="job_name" type="text" class="form-control"
+                           value="{{ current_job.name|default_if_none:'' }}"
+                           placeholder="Customer Name / Business Name">
+                </div>
+            </div>
+        </div>
+
+        <!-- ROW 2: SIZE, PAGE, TYPE, BDG, COPIES -->
+        <div class="row g-3 form-row-gap header-row-2">
+            <div class="col-md-2">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text">SIZE</span>
+                    <label for="job_size" class="visually-hidden-form-label">Size</label>
+                    <input id="job_size" name="job_size" type="text" class="form-control" value="{{ current_job.size|default_if_none:'' }}" placeholder="A4, A5, Custom">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text">PAGE</span>
+                    <label for="job_page" class="visually-hidden-form-label">Page</label>
+                    <input id="job_page" name="job_page" type="text" class="form-control" value="{{ current_job.page|default_if_none:'' }}" placeholder="Total pages">
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text">Style</span>
+                    <label for="job_style" class="visually-hidden-form-label">Style</label>
+                    <input id="job_style_id_snapshot" name="job_style_id_snapshot" type="hidden" value="{{ current_job.job_style_id_snapshot|default_if_none:'' }}">
+                    <select id="job_style" name="job_style" class="form-select">
+                        <option value="" {% if not current_job.job_style %}selected{% endif %}>Select Binding...</option>
+                        {% if job_style_saved_missing %}
+                            <option value="{{ current_job.job_style }}" data-option-id="{{ current_job.job_style_id_snapshot|default_if_none:'' }}" selected>{{ current_job.job_style }}</option>
+                        {% endif %}
+                        {% for option in job_style_options %}
+                            <option value="{{ option.name }}" data-option-id="{{ option.pk }}" {% if current_job.job_style == option.name %}selected{% endif %}>{{ option.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+        </div>
+
+
+        <!-- ROW 3: SIZE, PAGE, TYPE, BDG, COPIES -->
+        <div class="row g-3 form-row-gap header-row-3">
+            <div class="col-md-2">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text">copies</span>
+                    <label for="job_copies" class="visually-hidden-form-label">Copies</label>
+                    <input id="job_copies" name="job_copies" type="text" class="form-control"
+                           value="{{ current_job.copies|default_if_none:'' }}"
+                           placeholder="Total copies">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text">ink</span>
+                    <label for="job_ink" class="visually-hidden-form-label">Ink</label>
+                    <input id="job_ink" name="job_ink" type="text" class="form-control" value="{{ current_job.ink|default_if_none:'' }}" placeholder="Ink / Color">
+                </div>
+            </div>
+
+            <div class="col-md-2">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text">S/S &nbsp; F/B</span>
+                    <label for="job_ss_fb" class="visually-hidden-form-label">S/S F/B</label>
+                    <input id="job_ss_fb" name="job_ss_fb" type="text" class="form-control" value="{{ current_job.ss_fb|default_if_none:'' }}" placeholder="">
+                </div>
+            </div>
+
+            <div class="col-md-5">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text">Binder</span>
+                    <label for="job_binder" class="visually-hidden-form-label">Binder</label>
+                    <input id="job_binder" name="job_binder" type="text" class="form-control" value="{{ current_job.binder|default_if_none:'' }}" placeholder="binder name">
+                </div>
+            </div>
+
+        </div>
+        </div>
+
+
+        </div>
+<!-- 3 MAIN COLUMNS: PRINTING | PAPER | BINDING -->
+        <div class="row g-4 mb-2 main-columns-row">
+
+            <!-- COLUMN 1: PRINTING -->
+            <div class="col-lg-4 col-md-12">
+                <div class="form-block border rounded bg-light h-100">
+                    <div class="section-banner banner-printing text-center">PRINTING</div>
+
+                    <!-- Plates Row -->
+                    <div class="d-flex align-items-center field-row print-line">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">PLATES</span>
+                            <label for="printing_plates_qty" class="visually-hidden-form-label">Printing Plates Qty</label>
+                            <input id="printing_plates_qty" name="printing_plates_qty" type="text" class="form-control"
+                                   min="0" step="0.01" value="{{ current_job.printing_plates_qty|default_if_none:'' }}" data-printing-calc>
+                        </div>
+                        <span class="symbol-txt">×</span>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text rs-label">Rs</span>
+                            <label for="printing_plates_price" class="visually-hidden-form-label">Printing Plates Price</label>
+                            <input id="printing_plates_price" name="printing_plates_price" type="text" class="form-control"
+                                   min="0" step="0.01" value="{{ current_job.printing_plates_price|default_if_none:'' }}" data-printing-calc>
+                        </div>
+                        <div class="input-group input-group-sm total-group">
+                            <span class="input-group-text rs-label">Rs</span>
+                            <label for="printing_plates_total" class="visually-hidden-form-label">Printing Plates Total</label>
+                            <input id="printing_plates_total" name="printing_plates_total" type="text"
+                                   class="form-control form-control-sm bg-white text-end" value="{{ printing_plates_total_value }}" readonly>
+                        </div>
+                    </div>
+
+                    <!-- PTG Row -->
+                    <div class="d-flex align-items-center field-row print-line">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">PTG</span>
+                            <label for="printing_ptg_qty" class="visually-hidden-form-label">Printing PTG Qty</label>
+                            <input id="printing_ptg_qty" name="printing_ptg_qty" type="text" class="form-control"
+                                   min="0" step="0.01" value="{{ current_job.printing_ptg_qty|default_if_none:'' }}" data-printing-calc>
+                        </div>
+                        <span class="symbol-txt">×</span>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text rs-label">Rs</span>
+                            <label for="printing_ptg_price" class="visually-hidden-form-label">Printing PTG Price</label>
+                            <input id="printing_ptg_price" name="printing_ptg_price" type="text" class="form-control"
+                                   min="0" step="0.01" value="{{ current_job.printing_ptg_price|default_if_none:'' }}" data-printing-calc>
+                        </div>
+                        <div class="input-group input-group-sm total-group">
+                            <span class="input-group-text rs-label">Rs</span>
+                            <label for="printing_ptg_total" class="visually-hidden-form-label">Printing PTG Total</label>
+                            <input id="printing_ptg_total" name="printing_ptg_total" type="text"
+                                   class="form-control form-control-sm bg-white text-end" value="{{ printing_ptg_total_value }}" readonly>
+                        </div>
+                    </div>
+
+                    <!-- LAM/UV -->
+                    <div class="printing-cost-row field-row">
+                        <span class="cost-label">LAM/UV</span>
+                        <label for="printing_lam_uv" class="visually-hidden-form-label">Lam Uv</label>
+                        <input id="printing_lam_uv" name="printing_lam_uv" type="text"
+                               class="form-control form-control-sm cost-details" value="{{ current_job.printing_lam_uv|default_if_none:'' }}" placeholder="Text / Details">
+                        <span class="cost-rs">Rs</span>
+                        <label for="printing_lam_uv_price" class="visually-hidden-form-label">LAM/UV Price</label>
+                        <input id="printing_lam_uv_price" name="printing_lam_uv_price" type="text"
+                               class="form-control form-control-sm cost-amount" min="0" step="0.01" value="{{ current_job.printing_lam_uv_price|default_if_none:'' }}" data-printing-calc>
+                    </div>
+
+                    <!-- BDG -->
+                    <div class="printing-cost-row field-row">
+                        <span class="cost-label">BDG</span>
+                        <label for="printing_bdg" class="visually-hidden-form-label">Bdg</label>
+                        <input id="printing_bdg" name="printing_bdg" type="text"
+                               class="form-control form-control-sm cost-details" value="{{ current_job.printing_bdg|default_if_none:'' }}" placeholder="Text / Details">
+                        <span class="cost-rs">Rs</span>
+                        <label for="printing_bdg_price" class="visually-hidden-form-label">BDG Price</label>
+                        <input id="printing_bdg_price" name="printing_bdg_price" type="text"
+                               class="form-control form-control-sm cost-amount" min="0" step="0.01" value="{{ current_job.printing_bdg_price|default_if_none:'' }}" data-printing-calc>
+                    </div>
+
+                    <!-- OTHER / GST -->
+                    <div class="printing-cost-row field-row">
+                        <span class="cost-label">OTHER/GST</span>
+                        <label for="printing_other_gst" class="visually-hidden-form-label">Other Gst</label>
+                        <input id="printing_other_gst" name="printing_other_gst" type="text"
+                               class="form-control form-control-sm cost-details" value="{{ current_job.printing_other_gst|default_if_none:'' }}" placeholder="Text / Details">
+                        <span class="cost-rs">Rs</span>
+                        <label for="printing_other_gst_price" class="visually-hidden-form-label">Other/GST Price</label>
+                        <input id="printing_other_gst_price" name="printing_other_gst_price" type="text"
+                               class="form-control form-control-sm cost-amount" min="0" step="0.01" value="{{ current_job.printing_other_gst_price|default_if_none:'' }}" data-printing-calc>
+                    </div>
+
+                    <!-- PAPER -->
+                    <div class="printing-cost-row field-row">
+                        <span class="cost-label">PAPER</span>
+                        <label for="printing_paper_details" class="visually-hidden-form-label">Paper</label>
+                        <input id="printing_paper_details" name="printing_paper_details" type="text"
+                               class="form-control form-control-sm cost-details" value="{{ current_job.printing_paper_details|default_if_none:'' }}" placeholder="Text / Details">
+                        <span class="cost-rs">Rs</span>
+                        <label for="printing_paper_amount" class="visually-hidden-form-label">Paper Amount</label>
+                        <input id="printing_paper_amount" name="printing_paper_amount" type="text"
+                               class="form-control form-control-sm cost-amount" min="0" step="0.01" value="{{ current_job.printing_paper_amount|default_if_none:'' }}" data-printing-calc>
+                    </div>
+
+                    <!-- PRINTING TOTAL: Rs and amount stay on the exact same vertical line -->
+                    <div class="printing-cost-row printing-total-row field-row">
+                        <span class="total-caption">TOTAL</span>
+                        <span class="cost-rs">Rs</span>
+                        <label for="printing_total" class="visually-hidden-form-label">Printing Total</label>
+                        <input id="printing_total" name="printing_total" type="text"
+                               class="form-control form-control-sm bg-white fw-bold cost-amount"
+                               value="{{ printing_total_value }}" readonly>
+                    </div>
+
+                    <div class="payment-row field-row">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">PAID Rs</span>
+                            <label for="printing_paid_rs" class="visually-hidden-form-label">Paid Rs</label>
+                            <input id="printing_paid_rs" name="printing_paid_rs" type="text" class="form-control"
+                                   min="0" step="0.01" value="{{ current_job.printing_paid_rs|default_if_none:'' }}" data-printing-calc>
+                        </div>
+
+
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">DATE</span>
+                            <label for="printing_paid_date" class="visually-hidden-form-label">Printing Paid Date</label>
+                            <input id="printing_paid_date" name="printing_paid_date" type="text" class="form-control js-date-field"
+                                   value="{{ printing_paid_date_value }}"
+                                   placeholder="dd-mm-yyyy">
+                        </div>
+
+
+                    </div>
+
+                    <div class="payment-row field-row">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">REFERENCE</span>
+                            <label for="printing_reference" class="visually-hidden-form-label">Reference</label>
+                            <input id="printing_reference" name="printing_reference" type="text" class="form-control" value="{{ current_job.printing_reference|default_if_none:'' }}">
+                        </div>
+
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">THRU</span>
+                            <label for="printing_thru" class="visually-hidden-form-label">Thru</label>
+                            <input id="printing_thru" name="printing_thru" type="text" class="form-control" value="{{ current_job.printing_thru|default_if_none:'' }}">
+                        </div>
+                    </div>
+
+
+                </div>
+            </div>
+
+            <!-- COLUMN 2: PAPER -->
+            <div class="col-lg-4 col-md-6">
+                <div class="form-block border rounded bg-light h-100">
+                    <div class="section-banner banner-paper text-center">PAPER</div>
+
+                    <div class="row g-1 field-row">
+                        <div class="col-6">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">QTY</span>
+                                <label for="paper_qty" class="visually-hidden-form-label">Paper Qty</label>
+                                <input id="paper_qty" name="paper_qty" type="text" class="form-control"
+                                       value="{{ current_job.paper_qty|default_if_none:'' }}"
+                                       placeholder="quality">
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">SIZE</span>
+                                <label for="paper_size" class="visually-hidden-form-label">Size</label>
+                                <input id="paper_size" name="paper_size" type="text" class="form-control"
+                                       value="{{ current_job.paper_size|default_if_none:'' }}"
+                                       placeholder="Sheet Size">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-1 field-row">
+                        <div class="col-6">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">Quality</span>
+                                <label for="paper_quality" class="visually-hidden-form-label">Paper Quality</label>
+                                <input id="paper_quality" name="paper_quality" type="text" class="form-control"
+                                       value="{{ current_job.paper_quality|default_if_none:'' }}"
+                                       placeholder="Quantity">
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">gsm</span>
+                                <label for="paper_gsm" class="visually-hidden-form-label">Gsm</label>
+                                <input id="paper_gsm" name="paper_gsm" type="text" class="form-control"
+                                       value="{{ current_job.paper_gsm|default_if_none:'' }}"
+                                       placeholder="GSM">
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <div class="input-group input-group-sm field-row">
+                            <span class="input-group-text">TOTAL Rs</span>
+                            <label for="paper_total_rs" class="visually-hidden-form-label">Total Rs</label>
+                            <input id="paper_total_rs" name="paper_total_rs" type="text" class="form-control"
+                                   min="0" step="0.01" value="{{ current_job.paper_total_rs|default_if_none:'' }}" data-paper-calc>
+                        </div>
+
+                    <div class="input-group input-group-sm field-row">
+                        <input id="paper_discount_2" name="paper_discount_2" type="text" class="form-control"
+                               value="{{ current_job.paper_discount_2|default_if_none:'' }}"
+                               placeholder="text">
+                    </div>
+
+                    <div class="input-group input-group-sm field-row">
+                        <span class="input-group-text">VENDOR</span>
+                        <label for="paper_vendor" class="visually-hidden-form-label">Vendor</label>
+                        <input id="paper_vendor_id_snapshot" name="paper_vendor_id_snapshot" type="hidden" value="{{ current_job.paper_vendor_id_snapshot|default_if_none:'' }}">
+                        <select id="paper_vendor" name="paper_vendor" class="form-select">
+                            <option value="" {% if not current_job.paper_vendor %}selected{% endif %}>Select Vendor...</option>
+                            {% if paper_vendor_saved_missing %}
+                                <option value="{{ current_job.paper_vendor }}" data-option-id="{{ current_job.paper_vendor_id_snapshot|default_if_none:'' }}" selected>{{ current_job.paper_vendor }}</option>
+                            {% endif %}
+                            {% for option in paper_vendor_options %}
+                                <option value="{{ option.name }}" data-option-id="{{ option.pk }}" {% if current_job.paper_vendor == option.name %}selected{% endif %}>{{ option.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="payment-row field-row">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">PAID Rs</span>
+                            <label for="paper_paid_amount" class="visually-hidden-form-label">Paid Rs</label>
+                            <input id="paper_paid_amount" name="paper_paid_amount" type="text" class="form-control"
+                                   min="0" step="0.01" value="{{ current_job.paper_paid_amount|default_if_none:'' }}" data-paper-calc>
+                        </div>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">DATE</span>
+                            <label for="paper_paid_date" class="visually-hidden-form-label">Paper Paid Date</label>
+                            <input id="paper_paid_date" name="paper_paid_date" type="text" class="form-control js-date-field"
+                                   value="{{ paper_paid_date_value }}"
+                                   placeholder="dd-mm-yyyy">
+                        </div>
+                    </div>
+
+                    <div class="payment-row field-row">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">REFERENCE</span>
+                            <label for="paper_reference" class="visually-hidden-form-label">Reference</label>
+                            <input id="paper_reference" name="paper_reference" type="text" class="form-control" value="{{ current_job.paper_reference|default_if_none:'' }}">
+                        </div>
+
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">THRU</span>
+                            <label for="paper_thru" class="visually-hidden-form-label">Thru</label>
+                            <input id="paper_thru" name="paper_thru" type="text" class="form-control" value="{{ current_job.paper_thru|default_if_none:'' }}">
+                        </div>
+                    </div>
+
+                    <!-- PAPER TOTAL -->
+                    <div class="input-group input-group-sm total-box rounded mb-2">
+                        <span class="input-group-text bg-transparent border-0 fw-bold">TOTAL PAID</span>
+                        <label for="paper_total_paid_display" class="visually-hidden-form-label">Total Paid</label>
+                        <input id="paper_total_paid_display" name="paper_total_paid_display" type="text"
+                               class="form-control bg-white fw-bold text-end" value="{{ paper_total_paid_display_value }}" readonly>
+                    </div>
+
+                    <div class="input-group input-group-sm total-box rounded mb-2">
+                        <span class="input-group-text bg-transparent border-0 fw-bold">Balance</span>
+                        <label for="paper_balance" class="visually-hidden-form-label">Balance</label>
+                        <input id="paper_balance" name="paper_balance" type="text"
+                               class="form-control bg-white fw-bold text-end" value="{{ paper_balance_value }}" readonly>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- COLUMN 3: BINDING -->
+            <div class="col-lg-4 col-md-6">
+                <div class="form-block border rounded bg-light h-100 d-flex flex-column justify-content-between">
+                    <div>
+                        <div class="section-banner banner-binding text-center">BINDING OUTSOURCE</div>
+
+                        <div class="input-group input-group-sm field-row">
+                            <span class="input-group-text">QTY</span>
+                            <label for="binding_qty" class="visually-hidden-form-label">Qty</label>
+                            <input id="binding_qty" name="binding_qty" type="text" class="form-control"
+                                   value="{{ current_job.binding_qty|default_if_none:'' }}" placeholder="Quantity">
+                        </div>
+
+                        <div class="input-group input-group-sm field-row">
+                            <span class="input-group-text">RATE (@)</span>
+                            <label for="binding_rate_rate" class="visually-hidden-form-label">Rate Rate</label>
+                            <input id="binding_rate_rate" name="binding_rate_rate" type="text" class="form-control"
+                                   value="{{ current_job.binding_rate_rate|default_if_none:'' }}" placeholder="Rate per unit">
+                        </div>
+
+                        <div class="input-group input-group-sm field-row">
+                            <span class="input-group-text">TOTAL Rs</span>
+                            <label for="binding_total_rs" class="visually-hidden-form-label">Total Rs</label>
+                            <input id="binding_total_rs" name="binding_total_rs" type="text"
+                                   class="form-control" min="0" step="0.01" value="{{ current_job.binding_total_rs|default_if_none:'' }}" data-binding-calc
+                                   placeholder="Total Binding Rs">
+                        </div>
+
+                        <div class="input-group input-group-sm field-row">
+                            <input id="binding_discount" name="binding_discount" type="text" class="form-control"
+                                   value="{{ current_job.binding_discount|default_if_none:'' }}"
+                                   placeholder="text">
+                        </div>
+
+                        <div class="input-group input-group-sm field-row">
+                            <span class="input-group-text">VENDOR</span>
+                            <label for="binding_vendor" class="visually-hidden-form-label">Binding Vendor</label>
+                            <input id="binding_vendor_id_snapshot" name="binding_vendor_id_snapshot" type="hidden" value="{{ current_job.binding_vendor_id_snapshot|default_if_none:'' }}">
+                            <select id="binding_vendor" name="binding_vendor" class="form-select">
+                                <option value="" {% if not current_job.binding_vendor %}selected{% endif %}>Select Vendor...</option>
+                                {% if binding_vendor_saved_missing %}
+                                    <option value="{{ current_job.binding_vendor }}" data-option-id="{{ current_job.binding_vendor_id_snapshot|default_if_none:'' }}" selected>{{ current_job.binding_vendor }}</option>
+                                {% endif %}
+                                {% for option in binding_vendor_options %}
+                                    <option value="{{ option.name }}" data-option-id="{{ option.pk }}" {% if current_job.binding_vendor == option.name %}selected{% endif %}>{{ option.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="payment-row field-row">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">PAID Rs</span>
+                                <label for="binding_paid_rs" class="visually-hidden-form-label">Paid Rs</label>
+                                <input id="binding_paid_rs" name="binding_paid_rs" type="text" class="form-control"
+                                       min="0" step="0.01" value="{{ current_job.binding_paid_rs|default_if_none:'' }}" data-binding-calc placeholder="Paid">
+                            </div>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">DATE</span>
+                                <label for="binding_paid_date" class="visually-hidden-form-label">Binding Paid Date</label>
+                                <input id="binding_paid_date" name="binding_paid_date" type="text" class="form-control js-date-field"
+                                       value="{{ binding_paid_date_value }}"
+                                       placeholder="dd-mm-yyyy">
+                            </div>
+                        </div>
+
+                        <div class="payment-row field-row">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">REFERENCE</span>
+                                <label for="binding_reference" class="visually-hidden-form-label">Reference</label>
+                                <input id="binding_reference" name="binding_reference" type="text" class="form-control" value="{{ current_job.binding_reference|default_if_none:'' }}">
+                            </div>
+
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">THRU</span>
+                                <label for="binding_thru" class="visually-hidden-form-label">Thru</label>
+                                <input id="binding_thru" name="binding_thru" type="text" class="form-control" value="{{ current_job.binding_thru|default_if_none:'' }}">
+                            </div>
+                        </div>
+
+                        <!-- PAPER TOTAL -->
+                        <div class="input-group input-group-sm total-box rounded mb-2">
+                            <span class="input-group-text bg-transparent border-0 fw-bold">TOTAL PAID</span>
+                            <label for="binding_total_paid_display" class="visually-hidden-form-label">Binding Total Paid</label>
+                            <input id="binding_total_paid_display" name="binding_total_paid_display" type="text"
+                                   class="form-control bg-white fw-bold text-end" value="{{ binding_total_paid_display_value }}" readonly>
+                        </div>
+
+                        <div class="input-group input-group-sm total-box rounded mb-2">
+                        <span class="input-group-text bg-transparent border-0 fw-bold">Balance</span>
+                        <label for="binding_balance" class="visually-hidden-form-label">Binding Balance</label>
+                        <input id="binding_balance" name="binding_balance" type="text"
+                               class="form-control bg-white fw-bold text-end" value="{{ binding_balance_value }}" readonly>
+                    </div>
+
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Separate summary row: starts from PRINTING side, but is NOT inside any main column -->
+        <div class="below-columns-summary">
+            <div class="printing-side-summary">
+                <div class="balance-pair">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-danger text-white">PREV BAL</span>
+                        <label for="summary_prev_bal" class="visually-hidden-form-label">Prev Bal</label>
+                        <input id="summary_prev_bal" name="summary_prev_bal" type="text"
+                               class="form-control fw-bold text-danger" value="{{ summary_prev_bal_display_value }}" data-printing-calc readonly>
+                    </div>
+
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text">BALANCE</span>
+                        <label for="summary_balance" class="visually-hidden-form-label">Balance</label>
+                        <input id="summary_balance" name="summary_balance" type="text"
+                               class="form-control fw-bold" value="{{ summary_balance_value }}" readonly>
+                    </div>
+                </div>
+            </div>
+
+            <div class="job-total-summary">
+                <div class="input-group input-group-sm grand-total-box rounded">
+                    <span class="input-group-text bg-transparent border-0 fw-bold text-dark">TOTAL OF THIS JOB</span>
+                    <label for="binding_total_of_this_job" class="visually-hidden-form-label">Total Of This Job</label>
+                    <input id="binding_total_of_this_job" name="binding_total_of_this_job" type="text"
+                           class="form-control bg-white fw-bold text-end text-success"
+                           value="{{ total_of_this_job_value }}" readonly>
+                </div>
+            </div>
+        </div>
+
+        <!-- FOOTER ACTION BUTTONS -->
+        <div class="d-flex flex-wrap justify-content-center footer-actions border-top">
+            <button id="btn_system_value" name="btn_system_value" class="btn btn-sm btn-outline-secondary px-3"
+                    type="button" data-bs-toggle="modal" data-bs-target="#systemValueModal"><i
+                    class="bi bi-gear me-1"></i>SYSTEM VALUE
+            </button>
+            <div class="input-group input-group-sm" style="width: 205px;">
+                <label for="footer_total_of_this_job" class="visually-hidden-form-label">Total Of This Job</label>
+                <input id="footer_total_of_this_job" name="footer_total_of_this_job" type="text" class="form-control"
+                       placeholder="Job no / name / total">
+                <button id="btn_search" name="btn_search" class="btn btn-outline-primary" type="button"><i
+                        class="bi bi-search"></i></button>
+            </div>
+
+            <button id="btn_top" name="btn_top" class="btn btn-sm btn-secondary px-3"
+                    type="button" {% if not first_job or current_job and current_job.pk == first_job.pk %}disabled{% endif %}>
+                <i class="bi bi-arrow-up me-1"></i>TOP
+            </button>
+
+
+            <button id="btn_previous" name="btn_previous" class="btn btn-sm btn-secondary px-3"
+                    type="button" {% if current_job and not has_previous_job or not current_job and not last_job %}disabled{% endif %}>
+                <i class="bi bi-arrow-left me-1"></i>PREVIOUS
+            </button>
+            <button id="btn_next" name="btn_next" class="btn btn-sm btn-secondary px-3"
+                    type="button" {% if current_job and not has_next_job or not current_job and not first_job %}disabled{% endif %}>
+                NEXT<i class="bi bi-arrow-right ms-1"></i>
+            </button>
+
+            <button id="btn_bottom" name="btn_bottom" class="btn btn-sm btn-secondary px-3"
+                    type="button" {% if not last_job or current_job and current_job.pk == last_job.pk %}disabled{% endif %}>
+                BOTTOM<i class="bi bi-arrow-down ms-1"></i>
+            </button>
+
+            <button id="btn_list" name="btn_list" class="btn btn-sm btn-primary px-3 fw-bold" type="button">
+                <i class="bi bi-list me-1"></i>LIST
+            </button>
+
+            <button id="btn_options" name="btn_options" class="btn btn-sm btn-primary px-3 fw-bold" type="button">
+                <i class="bi bi-gear me-1"></i>OPTIONS
+            </button>
+
+            <button id="btn_new" name="btn_new" class="btn btn-sm btn-success px-4 fw-bold" type="button">
+                <i class="bi bi-plus-circle me-1"></i>NEW
+            </button>
+
+            <button id="btn_update" name="btn_update" class="btn btn-sm btn-success px-4 fw-bold" type="submit">
+                <i class="bi {% if current_job %}bi-pencil{% else %}bi-floppy{% endif %} me-1"></i>{% if current_job %}UPDATE{% else %}SAVE{% endif %}
+            </button>
+
+            <button id="btn_report" name="btn_report" class="btn btn-sm btn-info text-white px-3" type="button">
+                <i class="bi bi-file-earmark-bar-graph me-1">
+
+                </i>REPORT
+            </button>
+
+            <button id="btn_exit" name="btn_exit" class="btn btn-sm btn-danger px-3 fw-bold" type="button">
+                <i class="bi bi-box-arrow-right me-1"></i>EXIT
+            </button>
+        </div>
+
+    </form>
+    {{ vendor_account_totals|json_script:"vendor-account-totals-data" }}
+</div>
+
+
+<script>
+    function padDatePart(value) {
+        return String(value).padStart(2, '0');
+    }
+
+    function isoToDisplayDate(value) {
+        if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+            return value || '';
+        }
+        const parts = value.split('-');
+        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+
+    function displayToIsoDate(value) {
+        const clean = String(value || '').trim();
+        const displayMatch = clean.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+        if (displayMatch) {
+            return `${displayMatch[3]}-${padDatePart(displayMatch[2])}-${padDatePart(displayMatch[1])}`;
+        }
+        if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+            return clean;
+        }
+        return '';
+    }
+
+    function todayIsoDate() {
+        const date = new Date();
+        return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
+    }
+
+    function focusNextEditableField(currentField, backwards) {
+        const selector = [
+            'input:not([type="hidden"]):not([disabled]):not([readonly])',
+            'select:not([disabled]):not([readonly])',
+            'textarea:not([disabled]):not([readonly])',
+            'button:not([disabled])',
+        ].join(',');
+        const fields = Array.from(document.querySelectorAll(selector)).filter(function (field) {
+            return field.tabIndex >= 0 && field.offsetParent !== null;
+        });
+        const currentIndex = fields.indexOf(currentField);
+        if (currentIndex === -1) {
+            return;
+        }
+        const nextIndex = backwards ? currentIndex - 1 : currentIndex + 1;
+        const nextField = fields[nextIndex];
+        if (nextField) {
+            nextField.focus();
+        }
+    }
+
+    function setupDateFields() {
+        document.querySelectorAll('.js-date-field').forEach(function (field) {
+            const today = todayIsoDate();
+            field.value = field.value ? isoToDisplayDate(displayToIsoDate(field.value) || field.value) : isoToDisplayDate(today);
+
+            function openDatePicker() {
+                const isoValue = displayToIsoDate(field.value) || today;
+                field.type = 'date';
+                field.value = isoValue;
+                if (typeof field.showPicker === 'function') {
+                    setTimeout(function () {
+                        field.showPicker();
+                    }, 0);
+                }
+            }
+
+            field.addEventListener('mousedown', function () {
+                openDatePicker();
+            });
+
+            field.addEventListener('focus', function () {
+                openDatePicker();
+            });
+
+            field.addEventListener('keydown', function (event) {
+                if (event.key === 'Tab') {
+                    event.preventDefault();
+                    const isoValue = displayToIsoDate(field.value) || today;
+                    field.type = 'text';
+                    field.value = isoToDisplayDate(isoValue);
+                    focusNextEditableField(field, event.shiftKey);
+                    return;
+                }
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    openDatePicker();
+                }
+            });
+
+            field.addEventListener('blur', function () {
+                const isoValue = displayToIsoDate(field.value);
+                field.type = 'text';
+                field.value = isoValue ? isoToDisplayDate(isoValue) : isoToDisplayDate(today);
+            });
+
+            field.addEventListener('change', function () {
+                if (field.type === 'date') {
+                    field.dataset.isoValue = field.value;
+                }
+            });
+        });
+
+        const form = document.getElementById('printing_job_form');
+        if (form) {
+            form.addEventListener('submit', function () {
+                document.querySelectorAll('.js-date-field').forEach(function (field) {
+                    const isoValue = displayToIsoDate(field.value) || todayIsoDate();
+                    field.type = 'text';
+                    field.value = isoToDisplayDate(isoValue);
+                });
+            });
+        }
+    }
+
+    function setupReadonlyTabSkip() {
+        document.querySelectorAll('input[readonly], textarea[readonly], select[readonly]').forEach(function (field) {
+            field.tabIndex = -1;
+        });
+    }
+
+    function blankNonDatePlaceholders() {
+        document.querySelectorAll('input[placeholder]:not(.js-date-field)').forEach(function (input) {
+            input.placeholder = '';
+        });
+    }
+
+    function setupUppercaseTextFields() {
+        document.querySelectorAll('input[type="text"], textarea').forEach(function (field) {
+            field.addEventListener('input', function () {
+                const start = field.selectionStart;
+                const end = field.selectionEnd;
+                field.value = field.value.toUpperCase();
+                if (typeof start === 'number' && typeof end === 'number') {
+                    field.setSelectionRange(start, end);
+                }
+            });
+        });
+    }
+
+    function setupDigitsOnlyAmountFields() {
+        const selector = [
+            '[data-printing-calc]',
+            '[data-paper-calc]',
+            '[data-binding-calc]',
+            '#system_starting_amount',
+        ].join(',');
+        function wholeNumberText(value) {
+            const beforePoint = String(value || '').replace(/,/g, '').split('.')[0];
+            return beforePoint.replace(/\D/g, '');
+        }
+        document.querySelectorAll(selector).forEach(function (field) {
+            field.setAttribute('inputmode', 'numeric');
+            field.setAttribute('pattern', '[0-9]*');
+            field.value = wholeNumberText(field.value);
+            field.addEventListener('input', function () {
+                const start = field.selectionStart;
+                const oldLength = field.value.length;
+                field.value = wholeNumberText(field.value);
+                if (typeof start === 'number') {
+                    const diff = oldLength - field.value.length;
+                    const nextPosition = Math.max(0, start - diff);
+                    field.setSelectionRange(nextPosition, nextPosition);
+                }
+            });
+            field.addEventListener('paste', function (event) {
+                event.preventDefault();
+                const text = (event.clipboardData || window.clipboardData).getData('text') || '';
+                const digits = wholeNumberText(text);
+                document.execCommand('insertText', false, digits);
+            });
+        });
+        const form = document.getElementById('printing_job_form');
+        if (form) {
+            form.addEventListener('submit', function () {
+                document.querySelectorAll(selector).forEach(function (field) {
+                    field.value = wholeNumberText(field.value);
+                });
+            });
+        }
+    }
+
+    function syncSelectSnapshot(selectId, hiddenId) {
+        const select = document.getElementById(selectId);
+        const hidden = document.getElementById(hiddenId);
+        if (!select || !hidden) {
+            return;
+        }
+        const selectedOption = select.options[select.selectedIndex];
+        hidden.value = selectedOption ? (selectedOption.dataset.optionId || '') : '';
+    }
+
+    function setupSelectSnapshots() {
+        const fields = [
+            ['job_style', 'job_style_id_snapshot'],
+            ['paper_vendor', 'paper_vendor_id_snapshot'],
+            ['binding_vendor', 'binding_vendor_id_snapshot'],
+        ];
+        fields.forEach(function (pair) {
+            const select = document.getElementById(pair[0]);
+            if (select) {
+                select.addEventListener('change', function () {
+                    syncSelectSnapshot(pair[0], pair[1]);
+                });
+                syncSelectSnapshot(pair[0], pair[1]);
+            }
+        });
+
+        const form = document.getElementById('printing_job_form');
+        if (form) {
+            form.addEventListener('submit', function () {
+                fields.forEach(function (pair) {
+                    syncSelectSnapshot(pair[0], pair[1]);
+                });
+            });
+        }
+    }
+
+    const optionFieldMap = {
+        job_style: {
+            selectId: 'job_style',
+            hiddenId: 'job_style_id_snapshot',
+            placeholder: 'Select Binding...',
+        },
+        paper_vendor: {
+            selectId: 'paper_vendor',
+            hiddenId: 'paper_vendor_id_snapshot',
+            placeholder: 'Select Vendor...',
+        },
+        binding_vendor: {
+            selectId: 'binding_vendor',
+            hiddenId: 'binding_vendor_id_snapshot',
+            placeholder: 'Select Vendor...',
+        },
+    };
+
+    function appendSelectOption(select, value, label, optionId, selected) {
+        const option = document.createElement('option');
+        option.value = value || '';
+        option.textContent = label || '';
+        option.dataset.optionId = optionId ? String(optionId) : '';
+        option.selected = Boolean(selected);
+        select.appendChild(option);
+    }
+
+    function refreshOneOptionSelect(config, options) {
+        const select = document.getElementById(config.selectId);
+        const hidden = document.getElementById(config.hiddenId);
+        if (!select || !hidden) {
+            return;
+        }
+
+        const previousName = select.value;
+        const previousId = hidden.value;
+        const matchedById = previousId ? options.find(function (option) {
+            return String(option.id) === String(previousId);
+        }) : null;
+        const selectedName = matchedById ? matchedById.name : previousName;
+        const selectedId = matchedById ? matchedById.id : previousId;
+
+        select.innerHTML = '';
+        appendSelectOption(select, '', config.placeholder, '', !selectedName);
+
+        const selectedExists = options.some(function (option) {
+            return option.name === selectedName;
+        });
+        if (selectedName && !selectedExists) {
+            appendSelectOption(select, selectedName, selectedName, selectedId, true);
+        }
+
+        options.forEach(function (option) {
+            appendSelectOption(select, option.name, option.name, option.id, option.name === selectedName);
+        });
+        hidden.value = selectedName ? (selectedId || '') : '';
+    }
+
+    function refreshSelectOptionsFromServer() {
+        fetch("{% url 'job_entry:options_data' %}", {
+            cache: 'no-store',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('Options refresh failed');
+                }
+                return response.json();
+            })
+            .then(function (data) {
+                Object.keys(optionFieldMap).forEach(function (key) {
+                    refreshOneOptionSelect(optionFieldMap[key], data[key] || []);
+                });
+            })
+            .catch(function () {});
+    }
+
+    function setupLiveOptionRefresh() {
+        window.addEventListener('message', function (event) {
+            if (event.origin !== window.location.origin) {
+                return;
+            }
+            if (event.data && event.data.type === 'job-entry-options-changed') {
+                refreshSelectOptionsFromServer();
+            }
+        });
+        window.addEventListener('focus', function () {
+            refreshSelectOptionsFromServer();
+        });
+    }
+
+    function openSelectDropdown(select) {
+        if (typeof select.showPicker === 'function') {
+            select.showPicker();
+            return;
+        }
+        select.focus();
+        select.click();
+    }
+
+    function setupSelectKeyboardOpen() {
+        document.querySelectorAll('select').forEach(function (select) {
+            select.addEventListener('keydown', function (event) {
+                if (event.key !== 'Enter' && event.key !== ' ') {
+                    return;
+                }
+                event.preventDefault();
+                event.stopPropagation();
+                openSelectDropdown(select);
+            });
+        });
+    }
+
+    function numberInputValue(id) {
+        const field = document.getElementById(id);
+        if (!field) {
+            return 0;
+        }
+        return numberInputValueFromRaw(field.value);
+    }
+
+    function numberInputValueFromRaw(rawValue) {
+        const value = parseFloat(String(rawValue || '').replace(/[^0-9.-]/g, ''));
+        return Number.isFinite(value) ? value : 0;
+    }
+
+    function numberDataValue(id, dataName) {
+        const field = document.getElementById(id);
+        if (!field) {
+            return 0;
+        }
+        const value = parseFloat(String(field.dataset[dataName] || '').replace(/[^0-9.-]/g, ''));
+        return Number.isFinite(value) ? value : 0;
+    }
+
+    function amountText(value) {
+        if (!Number.isFinite(value) || Math.round(value) === 0) {
+            return '';
+        }
+        return String(Math.round(value));
+    }
+
+    function setInputValue(id, value) {
+        const field = document.getElementById(id);
+        if (field) {
+            field.value = amountText(value);
+        }
+    }
+
+    function calculateJobGrandTotal() {
+        const grandTotal =
+            numberInputValue('printing_total') +
+            numberInputValue('paper_total_rs') +
+            numberInputValue('binding_total_rs');
+
+        setInputValue('binding_total_of_this_job', grandTotal);
+    }
+
+    function calculatePrintingTotal() {
+        const platesTotal = numberInputValue('printing_plates_qty') * numberInputValue('printing_plates_price');
+        const ptgTotal = numberInputValue('printing_ptg_qty') * numberInputValue('printing_ptg_price');
+        const manualTotal =
+            numberInputValue('printing_lam_uv_price') +
+            numberInputValue('printing_bdg_price') +
+            numberInputValue('printing_other_gst_price') +
+            numberInputValue('printing_paper_amount');
+
+        const printingTotal = platesTotal + ptgTotal + manualTotal;
+        const balance = numberInputValue('summary_prev_bal') + printingTotal - numberInputValue('printing_paid_rs');
+
+        setInputValue('printing_plates_total', platesTotal);
+        setInputValue('printing_ptg_total', ptgTotal);
+        setInputValue('printing_total', printingTotal);
+        setInputValue('summary_balance', balance);
+        calculateJobGrandTotal();
+    }
+
+    function setupPrintingCalculator() {
+        document.querySelectorAll('[data-printing-calc]').forEach(function (field) {
+            field.addEventListener('input', calculatePrintingTotal);
+            field.addEventListener('change', calculatePrintingTotal);
+        });
+        calculatePrintingTotal();
+    }
+
+    function vendorAccountTotals() {
+        const script = document.getElementById('vendor-account-totals-data');
+        if (!script) {
+            return { paper: {}, binding: {} };
+        }
+        try {
+            return JSON.parse(script.textContent || '{}');
+        } catch (error) {
+            return { paper: {}, binding: {} };
+        }
+    }
+
+    function vendorBase(section, vendorName) {
+        const totals = vendorAccountTotals();
+        return (totals[section] && totals[section][vendorName]) || { bill: 0, paid: 0 };
+    }
+
+    function calculatePaperBalance() {
+        const total = numberInputValue('paper_total_rs');
+        const paid = numberInputValue('paper_paid_amount');
+        const vendor = document.getElementById('paper_vendor') ? document.getElementById('paper_vendor').value : '';
+        const base = vendorBase('paper', vendor);
+        const vendorBillTotal = numberInputValueFromRaw(base.bill) + total;
+        const vendorPaidTotal = numberInputValueFromRaw(base.paid) + paid;
+        setInputValue('paper_total_paid_display', vendorPaidTotal);
+        setInputValue('paper_balance', vendorBillTotal - vendorPaidTotal);
+        calculateJobGrandTotal();
+    }
+
+    function setupPaperCalculator() {
+        document.querySelectorAll('[data-paper-calc]').forEach(function (field) {
+            field.addEventListener('input', calculatePaperBalance);
+            field.addEventListener('change', calculatePaperBalance);
+        });
+        const paperVendor = document.getElementById('paper_vendor');
+        if (paperVendor) {
+            paperVendor.addEventListener('change', calculatePaperBalance);
+        }
+        calculatePaperBalance();
+    }
+
+    function calculateBindingBalance() {
+        const total = numberInputValue('binding_total_rs');
+        const paid = numberInputValue('binding_paid_rs');
+        const vendor = document.getElementById('binding_vendor') ? document.getElementById('binding_vendor').value : '';
+        const base = vendorBase('binding', vendor);
+        const vendorBillTotal = numberInputValueFromRaw(base.bill) + total;
+        const vendorPaidTotal = numberInputValueFromRaw(base.paid) + paid;
+
+        setInputValue('binding_total_paid_display', vendorPaidTotal);
+        setInputValue('binding_balance', vendorBillTotal - vendorPaidTotal);
+        calculateJobGrandTotal();
+    }
+
+    function setupBindingCalculator() {
+        document.querySelectorAll('[data-binding-calc]').forEach(function (field) {
+            field.addEventListener('input', calculateBindingBalance);
+            field.addEventListener('change', calculateBindingBalance);
+        });
+        const bindingVendor = document.getElementById('binding_vendor');
+        if (bindingVendor) {
+            bindingVendor.addEventListener('change', calculateBindingBalance);
+        }
+        calculateBindingBalance();
+    }
+
+    function hasStartingAmount() {
+        return numberInputValue('summary_prev_bal') !== 0 || numberInputValue('system_starting_amount') !== 0;
+    }
+
+    function showStartingAmountRequired() {
+        alert('Please System Value me jaakar STARTING AMOUNT fill karein, fir form fill karein.');
+        const modalElement = document.getElementById('systemValueModal');
+        const startingAmount = document.getElementById('system_starting_amount');
+        if (modalElement && window.bootstrap) {
+            const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+            modal.show();
+            setTimeout(function () {
+                if (startingAmount) {
+                    startingAmount.focus();
+                }
+            }, 300);
+        }
+    }
+
+    function setupStartingAmountGuard() {
+        {% if not current_job %}
+        if (hasStartingAmount()) {
+            return;
+        }
+        const form = document.getElementById('printing_job_form');
+        const allowedIds = new Set([
+            'btn_system_value',
+            'system_mail_from',
+            'system_mail_to',
+            'system_mail_cc',
+            'system_starting_amount',
+            'btn_system_send_email',
+            'btn_system_save',
+            'btn_system_cancel',
+        ]);
+        let noticeShown = false;
+        const guard = function (event) {
+            const target = event.target;
+            if (!target || allowedIds.has(target.id) || target.closest('#systemValueModal')) {
+                return;
+            }
+            if (target.closest('.footer-actions') && target.id !== 'btn_update') {
+                return;
+            }
+            event.preventDefault();
+            if (event.type === 'keydown') {
+                event.stopPropagation();
+            }
+            if (!noticeShown) {
+                noticeShown = true;
+                showStartingAmountRequired();
+            }
+        };
+        if (form) {
+            form.addEventListener('focusin', guard);
+            form.addEventListener('mousedown', guard);
+            form.addEventListener('keydown', guard);
+            form.addEventListener('submit', function (event) {
+                if (!hasStartingAmount()) {
+                    event.preventDefault();
+                    showStartingAmountRequired();
+                }
+            });
+        }
+        setTimeout(function () {
+            showStartingAmountRequired();
+        }, 300);
+        {% endif %}
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        {% if request.GET.saved == "1" %}
+        alert('Job entry successfully saved.');
+        {% endif %}
+        setupReadonlyTabSkip();
+        blankNonDatePlaceholders();
+        setupUppercaseTextFields();
+        setupDigitsOnlyAmountFields();
+        setupSelectSnapshots();
+        setupLiveOptionRefresh();
+        setupSelectKeyboardOpen();
+        setupDateFields();
+        setupPrintingCalculator();
+        setupPaperCalculator();
+        setupBindingCalculator();
+        setupStartingAmountGuard();
+        const jobForm = document.getElementById('printing_job_form');
+        if (jobForm) {
+            jobForm.addEventListener('keydown', function (event) {
+                const isEnter = event.key === 'Enter';
+                const isSaveUpdateButton = event.target && event.target.id === 'btn_update';
+                if (isEnter && !isSaveUpdateButton) {
+                    event.preventDefault();
+                }
+            });
+        }
+        const newButton = document.getElementById('btn_new');
+        if (newButton) {
+            newButton.addEventListener('click', function () {
+                window.location.href = "{% url 'job_entry:home' %}";
+            });
+        }
+        const listButton = document.getElementById('btn_list');
+        if (listButton) {
+            listButton.addEventListener('click', function () {
+                window.location.href = "{% url 'job_entry:job_list' %}";
+            });
+        }
+        const optionsButton = document.getElementById('btn_options');
+        if (optionsButton) {
+            optionsButton.addEventListener('click', function () {
+                window.open("{% url 'job_entry:options' %}", "_blank");
+            });
+        }
+        const searchButton = document.getElementById('btn_search');
+        const searchInput = document.getElementById('footer_total_of_this_job');
+        if (searchButton && searchInput) {
+            searchButton.addEventListener('click', function () {
+                const query = searchInput.value.trim();
+                window.location.href = "{% url 'job_entry:job_list' %}" + (query ? "?q=" + encodeURIComponent(query) : "");
+            });
+            searchInput.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    searchButton.click();
+                }
+            });
+        }
+        const reportButton = document.getElementById('btn_report');
+        if (reportButton) {
+            reportButton.addEventListener('click', function () {
+                const query = searchInput ? searchInput.value.trim() : "";
+                window.open("{% url 'job_entry:job_report_pdf' %}" + (query ? "?q=" + encodeURIComponent(query) : ""), "_blank");
+            });
+        }
+        const topButton = document.getElementById('btn_top');
+        if (topButton) {
+            topButton.addEventListener('click', function () {
+                window.location.href = "{% url 'job_entry:job_first' %}";
+            });
+        }
+        const bottomButton = document.getElementById('btn_bottom');
+        if (bottomButton) {
+            bottomButton.addEventListener('click', function () {
+                window.location.href = "{% url 'job_entry:job_last' %}";
+            });
+        }
+        const previousButton = document.getElementById('btn_previous');
+        if (previousButton) {
+            previousButton.addEventListener('click', function () {
+                {% if current_job %}
+                    window.location.href = "{% url 'job_entry:job_previous' current_job.pk %}";
+                {% else %}
+                    window.location.href = "{% url 'job_entry:job_last' %}";
+                {% endif %}
+            });
+        }
+        const nextButton = document.getElementById('btn_next');
+        if (nextButton) {
+            nextButton.addEventListener('click', function () {
+                {% if current_job %}
+                    window.location.href = "{% url 'job_entry:job_next' current_job.pk %}";
+                {% else %}
+                    window.location.href = "{% url 'job_entry:job_first' %}";
+                {% endif %}
+            });
+        }
+        const startingAmount = document.getElementById('system_starting_amount');
+        if (startingAmount) {
+            startingAmount.addEventListener('blur', function () {
+                const value = parseFloat(String(startingAmount.value || '').replace(/[^0-9.-]/g, ''));
+                startingAmount.value = Number.isFinite(value) && value !== 0 ? String(Math.round(value)) : '';
+            });
+        }
+    });
+</script>
+
+
+<!-- SYSTEM VALUE MODAL -->
+<div class="modal fade" id="systemValueModal" tabindex="-1"
+     aria-labelledby="systemValueModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h5 class="modal-title" id="systemValueModalLabel">
+                    <i class="bi bi-gear me-1"></i>SYSTEM VALUE
+                </h5>
+                <button type="button" class="btn-close"
+                        data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                {% if not current_job and not system_value.starting_amount %}
+                    <div class="alert alert-warning py-2 mb-2 fw-semibold" role="alert">
+                        Please STARTING AMOUNT fill karein, fir form fill karein.
+                    </div>
+                {% endif %}
+                <form id="system_value_form" name="system_value_form" method="post"
+                      action="{% url 'job_entry:system_value_save' %}" autocomplete="off">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+                    <div class="input-group input-group-sm system-field">
+                        <label class="input-group-text" for="system_mail_from">MAIL FROM</label>
+                        <input type="email"
+                               class="form-control"
+                               id="system_mail_from"
+                               name="system_mail_from"
+                               value="{{ system_value.mail_from|default_if_none:'' }}"
+                               placeholder="Mail From">
+                    </div>
+
+                    <div class="input-group input-group-sm system-field">
+                        <label class="input-group-text" for="system_mail_to">MAIL TO</label>
+                        <input type="email"
+                               class="form-control"
+                               id="system_mail_to"
+                               name="system_mail_to"
+                               value="{{ system_value.mail_to|default_if_none:'' }}"
+                               placeholder="Mail To">
+                    </div>
+
+                    <div class="input-group input-group-sm system-field">
+                        <label class="input-group-text" for="system_mail_cc">CC</label>
+                        <input type="email"
+                               class="form-control"
+                               id="system_mail_cc"
+                               name="system_mail_cc"
+                               value="{{ system_value.mail_cc|default_if_none:'' }}"
+                               placeholder="CC Email">
+                    </div>
+
+                    <div class="input-group input-group-sm system-field">
+                        <label class="input-group-text" for="system_starting_amount">STARTING AMOUNT</label>
+                        <input type="text"
+                               class="form-control"
+                               id="system_starting_amount"
+                               name="system_starting_amount"
+                               value="{{ system_starting_amount_value }}"
+                               placeholder="Starting Amount"
+                               min="0"
+                               step="0.01">
+                    </div>
+
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="submit"
+                        class="btn btn-sm btn-success fw-bold"
+                        id="btn_system_send_email"
+                        name="system_send_email_action"
+                        value="1"
+                        form="system_value_form">
+                    <i class="bi bi-floppy me-1"></i>SEND E-MAIL
+                </button>
+
+
+                <button type="submit"
+                        class="btn btn-sm btn-success fw-bold"
+                        id="btn_system_save"
+                        name="system_save_action"
+                        value="1"
+                        form="system_value_form">
+                    <i class="bi bi-floppy me-1"></i>SAVE
+                </button>
+
+                <button type="button"
+                        class="btn btn-sm btn-secondary"
+                        id="btn_system_cancel"
+                        name="btn_system_cancel"
+                        data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-1"></i>CANCEL
+                </button>
+
+                <button type="button"
+                        class="btn btn-sm btn-danger fw-bold"
+                        id="btn_system_exit"
+                        name="btn_system_exit"
+                        data-bs-dismiss="modal">
+                    <i class="bi bi-box-arrow-right me-1"></i>EXIT
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
+
+</body>
+</html>

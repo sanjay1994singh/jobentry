@@ -15,4 +15,4 @@ python manage.py runserver 127.0.0.1:8000
 Main apps:
 
 - `core`
-- `paper_job`
+- `job_entry`

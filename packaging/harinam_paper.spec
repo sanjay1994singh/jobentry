@@ -11,7 +11,7 @@ project_root = Path(SPECPATH).parent
 hiddenimports = (
     collect_submodules("harinam_paper")
     + collect_submodules("core")
-    + collect_submodules("paper_job")
+    + collect_submodules("job_entry")
     + [
         "whitenoise",
         "whitenoise.middleware",
@@ -27,6 +27,7 @@ a = Analysis(
     binaries=[],
     datas=[
         (str(project_root / "core" / "templates"), "core/templates"),
+        (str(project_root / "job_entry" / "templates"), "job_entry/templates"),
         (str(project_root / "staticfiles"), "staticfiles"),
     ],
     hiddenimports=hiddenimports,

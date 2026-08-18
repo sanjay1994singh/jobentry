@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Entry Options</title>
+    <link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.css' %}">
+    <style>
+        body { background: #eef2f7; color: #1f2937; font-family: "Segoe UI", system-ui, sans-serif; }
+        .page { padding: 12px; min-height: 100vh; }
+        .sheet { background: #fff; border-radius: 10px; box-shadow: 0 4px 18px rgba(0,0,0,.07); padding: 16px; }
+        .title { color: #163861; font-weight: 800; font-size: 1.35rem; margin: 0; }
+        .topbar { gap: 10px; }
+        .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+        .option-card { border: 1px solid #cbd8e8; border-radius: 8px; overflow: hidden; background: #f8fafc; min-width: 0; }
+        .option-head { background: #1f4f8f; color: #fff; font-weight: 800; padding: 8px 10px; text-align: center; letter-spacing: .2px; }
+        .option-body { padding: 10px; }
+        .add-row,
+        .option-row {
+            display: grid;
+            grid-template-columns: minmax(130px, 1fr) 72px 68px 64px;
+            gap: 6px;
+            align-items: center;
+        }
+        .add-row { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #dbe5f1; }
+        .option-row { margin-bottom: 7px; padding-bottom: 7px; border-bottom: 1px solid #e5edf6; }
+        .option-row:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+        .active-box { display: flex; gap: 4px; align-items: center; justify-content: center; font-size: .72rem; white-space: nowrap; }
+        .form-control { height: 30px; min-height: 30px; font-size: .78rem; }
+        .btn { height: 30px; min-height: 30px; padding: 4px 8px; font-size: .72rem; }
+        .btn-save { background: #059669; color: #fff; border: 0; }
+        .btn-delete { background: #dc2626; color: #fff; border: 0; }
+        .btn-back { background: #64748b; color: #fff; border: 0; }
+        .btn-new { background: #16a34a; color: #fff; border: 0; }
+        input[type="text"] { text-transform: uppercase; }
+        .empty { color: #64748b; font-size: .85rem; padding: 8px 0; }
+        @media (max-width: 1280px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 760px) {
+            .page { padding: 8px; }
+            .sheet { padding: 12px; }
+            .grid { grid-template-columns: 1fr; }
+            .add-row,
+            .option-row { grid-template-columns: 1fr 1fr; }
+            .add-row .form-control,
+            .option-row .form-control { grid-column: 1 / -1; }
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <div class="sheet">
+        <div class="topbar d-flex justify-content-between align-items-center border-bottom pb-2">
+            <h1 class="title"><i class="bi bi-gear me-2"></i>SELECT OPTIONS</h1>
+            <button id="btn_options_back" name="btn_options_back" class="btn btn-sm btn-back fw-bold" type="button">BACK</button>
+        </div>
+
+        {% if messages %}
+            <div class="mb-2">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags|default:'info' }} py-2 mb-2" role="alert">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="grid">
+            {% for group in option_groups %}
+                <section class="option-card">
+                    <div class="option-head">{{ group.title }}</div>
+                    <div class="option-body">
+                        <form class="add-row" method="post" action="{% url 'job_entry:option_save' group.key %}">
+                            {% csrf_token %}
+                            <input class="form-control form-control-sm" type="text" name="name" placeholder="New {{ group.title }}">
+                            <label class="active-box">
+                                <input type="checkbox" name="is_active" value="1" checked> Active
+                            </label>
+                            <button class="btn btn-sm btn-new fw-bold" type="submit">ADD</button>
+                            <button class="btn btn-sm btn-new fw-bold js-new-option" type="reset">NEW</button>
+                        </form>
+
+                        {% for item in group.items %}
+                            <div class="option-row">
+                                <form method="post" action="{% url 'job_entry:option_save' group.key %}" style="display: contents;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="option_id" value="{{ item.pk }}">
+                                    <input class="form-control form-control-sm" type="text" name="name" value="{{ item.name }}">
+                                    <label class="active-box">
+                                        <input type="checkbox" name="is_active" value="1" {% if item.is_active %}checked{% endif %}> Active
+                                    </label>
+                                    <button class="btn btn-sm btn-save fw-bold" type="submit">UPDATE</button>
+                                </form>
+                                <form class="js-delete-option" method="post" action="{% url 'job_entry:option_delete' group.key item.pk %}">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm btn-delete fw-bold" type="submit">DELETE</button>
+                                </form>
+                            </div>
+                        {% empty %}
+                            <div class="empty">No options yet.</div>
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+<script>
+    function notifyHomeOptionsChanged() {
+        if (window.opener && !window.opener.closed) {
+            window.opener.postMessage({ type: 'job-entry-options-changed' }, window.location.origin);
+        }
+    }
+
+    {% if options_changed %}
+    notifyHomeOptionsChanged();
+    {% endif %}
+
+    const backButton = document.getElementById('btn_options_back');
+    if (backButton) {
+        backButton.addEventListener('click', function () {
+            if (window.opener) {
+                window.close();
+            } else {
+                window.location.href = "{% url 'job_entry:home' %}";
+            }
+        });
+    }
+
+    document.querySelectorAll('.js-new-option').forEach(function (button) {
+        button.addEventListener('click', function () {
+            const form = button.closest('form');
+            if (!form) return;
+            setTimeout(function () {
+                const nameField = form.querySelector('input[name="name"]');
+                const activeField = form.querySelector('input[name="is_active"]');
+                if (nameField) {
+                    nameField.value = '';
+                    nameField.focus();
+                }
+                if (activeField) {
+                    activeField.checked = true;
+                }
+            }, 0);
+        });
+    });
+
+    document.querySelectorAll('.js-delete-option').forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            if (!confirm('Delete this option?')) {
+                event.preventDefault();
+            }
+        });
+    });
+
+    document.querySelectorAll('input[type="text"]').forEach(function (field) {
+        field.addEventListener('input', function () {
+            const start = field.selectionStart;
+            const end = field.selectionEnd;
+            field.value = field.value.toUpperCase();
+            field.setSelectionRange(start, end);
+        });
+    });
+</script>
+</body>
+</html>

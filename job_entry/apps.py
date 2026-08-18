@@ -1,6 +1,7 @@
 from django.apps import AppConfig
 
 
-class PaperJobConfig(AppConfig):
+class JobEntryConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
-    name = "paper_job"
+    name = "job_entry"
+    verbose_name = "Job Entry"

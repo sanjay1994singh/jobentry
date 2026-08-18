@@ -1,0 +1,20 @@
+.bi {
+    display: inline-block;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 1;
+}
+.bi-printer::before { content: "\1F5B6"; }
+.bi-gear::before { content: "\2699"; }
+.bi-search::before { content: "\2315"; }
+.bi-arrow-up::before { content: "\2191"; }
+.bi-arrow-left::before { content: "\2190"; }
+.bi-arrow-right::before { content: "\2192"; }
+.bi-arrow-down::before { content: "\2193"; }
+.bi-plus-circle::before { content: "+"; }
+.bi-pencil::before { content: "\270E"; }
+.bi-floppy::before { content: "\1F5AB"; }
+.bi-file-earmark-bar-graph::before { content: "\25A3"; }
+.bi-box-arrow-right::before { content: "\21B1"; }
+.bi-x-circle::before { content: "\00D7"; }
+.bi-list::before { content: "\2630"; }
