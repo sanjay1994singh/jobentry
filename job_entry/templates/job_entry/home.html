@@ -86,6 +86,15 @@
             flex: 0 0 auto;
         }
 
+        .job-card .input-group-text,
+        .job-card .printing-cost-row > .cost-label,
+        .job-card .printing-cost-row > .cost-rs,
+        .job-card .printing-total-row .total-caption,
+        .job-card .form-control,
+        .job-card .form-select {
+            font-size: 1rem !important;
+        }
+
         /* Very short labels such as Rs should not become unnecessarily wide */
         .input-group-text.rs-label {
             min-width: 38px !important;
@@ -724,6 +733,28 @@
             }
         }
 
+        .center-message-wrap {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 3000;
+            width: min(420px, calc(100vw - 32px));
+            pointer-events: none;
+        }
+
+        .center-message {
+            border: 0;
+            border-radius: 10px;
+            box-shadow: 0 18px 50px rgba(15, 23, 42, .28);
+            font-size: 1rem;
+            font-weight: 700;
+            text-align: center;
+            padding: 16px 18px;
+            margin-bottom: 10px;
+            pointer-events: auto;
+        }
+
     </style>
 
 </head>
@@ -734,9 +765,9 @@
         {% csrf_token %}
 
         {% if messages %}
-            <div class="mb-2">
+            <div id="center_message_wrap" class="center-message-wrap">
                 {% for message in messages %}
-                    <div class="alert alert-{{ message.tags|default:'info' }} py-2 mb-2" role="alert">
+                    <div class="alert alert-{{ message.tags|default:'info' }} center-message" role="alert">
                         {{ message }}
                     </div>
                 {% endfor %}
@@ -1266,13 +1297,16 @@
                     type="button" data-bs-toggle="modal" data-bs-target="#systemValueModal"><i
                     class="bi bi-gear me-1"></i>SYSTEM VALUE
             </button>
-            <div class="input-group input-group-sm" style="width: 205px;">
-                <label for="footer_total_of_this_job" class="visually-hidden-form-label">Total Of This Job</label>
-                <input id="footer_total_of_this_job" name="footer_total_of_this_job" type="text" class="form-control"
-                       placeholder="Job no / name / total">
-                <button id="btn_search" name="btn_search" class="btn btn-outline-primary" type="button"><i
-                        class="bi bi-search"></i></button>
-            </div>
+
+            <button id="btn_update" name="btn_update" class="btn btn-sm btn-success px-4 fw-bold" type="submit">
+                <i class="bi {% if current_job %}bi-pencil{% else %}bi-floppy{% endif %} me-1"></i>{% if current_job %}UPDATE{% else %}SAVE{% endif %}
+            </button>
+
+            <button id="btn_new" name="btn_new" class="btn btn-sm btn-success px-4 fw-bold" type="button">
+                <i class="bi bi-plus-circle me-1"></i>NEW
+            </button>
+
+
 
             <button id="btn_top" name="btn_top" class="btn btn-sm btn-secondary px-3"
                     type="button" {% if not first_job or current_job and current_job.pk == first_job.pk %}disabled{% endif %}>
@@ -1302,20 +1336,23 @@
                 <i class="bi bi-gear me-1"></i>OPTIONS
             </button>
 
-            <button id="btn_new" name="btn_new" class="btn btn-sm btn-success px-4 fw-bold" type="button">
-                <i class="bi bi-plus-circle me-1"></i>NEW
-            </button>
 
-            <button id="btn_update" name="btn_update" class="btn btn-sm btn-success px-4 fw-bold" type="submit">
-                <i class="bi {% if current_job %}bi-pencil{% else %}bi-floppy{% endif %} me-1"></i>{% if current_job %}UPDATE{% else %}SAVE{% endif %}
-            </button>
+
+
 
             <button id="btn_report" name="btn_report" class="btn btn-sm btn-info text-white px-3" type="button">
                 <i class="bi bi-file-earmark-bar-graph me-1">
-
                 </i>REPORT
             </button>
 
+            <div class="input-group input-group-sm" style="width: 205px;">
+                <label for="footer_total_of_this_job" class="visually-hidden-form-label">Total Of This Job</label>
+                <input id="footer_total_of_this_job" name="footer_total_of_this_job" type="text" class="form-control"
+                       placeholder="Job no / name / total">
+                <button id="btn_search" name="btn_search" class="btn btn-outline-primary" type="button"><i
+                        class="bi bi-search"></i></button>
+            </div>
+            
             <button id="btn_exit" name="btn_exit" class="btn btn-sm btn-danger px-3 fw-bold" type="button">
                 <i class="bi bi-box-arrow-right me-1"></i>EXIT
             </button>
@@ -1799,8 +1836,30 @@
         return numberInputValue('summary_prev_bal') !== 0 || numberInputValue('system_starting_amount') !== 0;
     }
 
+    function showCenterMessage(message, type) {
+        let wrap = document.getElementById('center_message_wrap');
+        if (!wrap) {
+            wrap = document.createElement('div');
+            wrap.id = 'center_message_wrap';
+            wrap.className = 'center-message-wrap';
+            document.body.appendChild(wrap);
+        }
+        const alertType = type || 'info';
+        const box = document.createElement('div');
+        box.className = 'alert alert-' + alertType + ' center-message';
+        box.setAttribute('role', 'alert');
+        box.textContent = message;
+        wrap.appendChild(box);
+        setTimeout(function () {
+            box.remove();
+            if (!wrap.children.length) {
+                wrap.remove();
+            }
+        }, 2400);
+    }
+
     function showStartingAmountRequired() {
-        alert('Please System Value me jaakar STARTING AMOUNT fill karein, fir form fill karein.');
+        showCenterMessage('Please System Value me jaakar STARTING AMOUNT fill karein, fir form fill karein.', 'warning');
         const modalElement = document.getElementById('systemValueModal');
         const startingAmount = document.getElementById('system_starting_amount');
         if (modalElement && window.bootstrap) {
@@ -1866,8 +1925,20 @@
     }
 
     document.addEventListener('DOMContentLoaded', function () {
+        const existingCenterMessages = document.querySelectorAll('#center_message_wrap .center-message');
+        if (existingCenterMessages.length) {
+            setTimeout(function () {
+                existingCenterMessages.forEach(function (box) {
+                    box.remove();
+                });
+                const wrap = document.getElementById('center_message_wrap');
+                if (wrap && !wrap.children.length) {
+                    wrap.remove();
+                }
+            }, 2400);
+        }
         {% if request.GET.saved == "1" %}
-        alert('Job entry successfully saved.');
+        showCenterMessage('Job entry successfully saved.', 'success');
         {% endif %}
         setupReadonlyTabSkip();
         blankNonDatePlaceholders();

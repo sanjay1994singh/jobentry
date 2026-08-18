@@ -155,9 +155,9 @@ def display_amount(value, blank_zero=True):
 
 
 def vendor_account_totals(current_job=None):
-    jobs = PrintingJobSheet.objects.all()
+    jobs = PrintingJobSheet.objects.order_by()
     if current_job:
-        jobs = jobs.exclude(pk=current_job.pk)
+        jobs = jobs.filter(job_no__lt=current_job.job_no)
     totals = {"paper": {}, "binding": {}}
     for row in (
         jobs.exclude(paper_vendor="")
@@ -180,11 +180,46 @@ def vendor_account_totals(current_job=None):
     return totals
 
 
+def vendor_total_decimal(totals, section, vendor, key):
+    try:
+        return Decimal(totals[section][vendor][key])
+    except (KeyError, InvalidOperation):
+        return Decimal("0")
+
+
 def next_prev_balance(system_value):
     latest_job = PrintingJobSheet.objects.order_by("-job_no").first()
     if latest_job:
-        return latest_job.summary_balance
+        return running_summary_balance_until(latest_job, system_value)["balance"]
     return system_value.starting_amount
+
+
+def running_summary_balance_until(current_job, system_value):
+    previous_balance = system_value.starting_amount
+    if not current_job:
+        return {"prev": previous_balance, "balance": previous_balance}
+
+    previous_jobs = PrintingJobSheet.objects.filter(job_no__lt=current_job.job_no).order_by("job_no")
+    if current_job.pk:
+        previous_jobs = previous_jobs.exclude(pk=current_job.pk)
+
+    for job in previous_jobs:
+        previous_balance = previous_balance + job.printing_total - job.printing_paid_rs
+
+    current_balance = previous_balance + current_job.printing_total - current_job.printing_paid_rs
+    return {"prev": previous_balance, "balance": current_balance}
+
+
+def running_summary_prev_for_job(job, system_value):
+    target_job_no = job.job_no or PrintingJobSheet.next_job_no()
+    previous_balance = system_value.starting_amount
+    previous_jobs = PrintingJobSheet.objects.filter(job_no__lt=target_job_no).order_by("job_no")
+    if job.pk:
+        previous_jobs = previous_jobs.exclude(pk=job.pk)
+
+    for previous_job in previous_jobs:
+        previous_balance = previous_balance + previous_job.printing_total - previous_job.printing_paid_rs
+    return previous_balance
 
 
 def has_printing_job_sheet_data(request):
@@ -322,6 +357,7 @@ def home(request, pk=None):
             return redirect("job_entry:job_edit", pk=current_job.pk) if current_job else redirect("job_entry:home")
         job = current_job or PrintingJobSheet()
         assign_printing_job_sheet(job, request)
+        job.summary_prev_bal = running_summary_prev_for_job(job, system_value)
         job.save()
         if current_job:
             messages.success(request, "Job entry successfully updated.")
@@ -344,11 +380,14 @@ def home(request, pk=None):
         "binding_vendor_saved_missing": saved_option_missing(BindingVendor, current_job.binding_vendor) if current_job else False,
         "system_value": system_value,
     }
-    context["summary_prev_bal_value"] = (
-        current_job.summary_prev_bal if current_job else next_prev_balance(context["system_value"])
-    )
+    summary_running = running_summary_balance_until(current_job, system_value)
+    context["summary_prev_bal_value"] = summary_running["prev"] if current_job else next_prev_balance(context["system_value"])
     amount_source = current_job
     vendor_totals = vendor_account_totals(current_job)
+    paper_bill_base = vendor_total_decimal(vendor_totals, "paper", current_job.paper_vendor, "bill") if current_job else Decimal("0")
+    paper_paid_base = vendor_total_decimal(vendor_totals, "paper", current_job.paper_vendor, "paid") if current_job else Decimal("0")
+    binding_bill_base = vendor_total_decimal(vendor_totals, "binding", current_job.binding_vendor, "bill") if current_job else Decimal("0")
+    binding_paid_base = vendor_total_decimal(vendor_totals, "binding", current_job.binding_vendor, "paid") if current_job else Decimal("0")
     first_job = PrintingJobSheet.objects.order_by("job_no").first()
     last_job = PrintingJobSheet.objects.order_by("-job_no").first()
     previous_job = (
@@ -364,12 +403,16 @@ def home(request, pk=None):
         "printing_ptg_total_value": display_amount(amount_source.printing_ptg_total) if amount_source else "",
         "printing_total_value": display_amount(amount_source.printing_total) if amount_source else "",
         "vendor_account_totals": vendor_totals,
-        "paper_total_paid_display_value": display_amount(amount_source.paper_total_paid_display) if amount_source else "",
-        "paper_balance_value": display_amount(amount_source.paper_balance) if amount_source else "",
-        "binding_total_paid_display_value": display_amount(amount_source.binding_total_paid_display) if amount_source else "",
-        "binding_balance_value": display_amount(amount_source.binding_balance) if amount_source else "",
+        "paper_total_paid_display_value": display_amount(paper_paid_base + amount_source.paper_paid_amount) if amount_source else "",
+        "paper_balance_value": display_amount(
+            (paper_bill_base + amount_source.paper_total_rs) - (paper_paid_base + amount_source.paper_paid_amount)
+        ) if amount_source else "",
+        "binding_total_paid_display_value": display_amount(binding_paid_base + amount_source.binding_paid_rs) if amount_source else "",
+        "binding_balance_value": display_amount(
+            (binding_bill_base + amount_source.binding_total_rs) - (binding_paid_base + amount_source.binding_paid_rs)
+        ) if amount_source else "",
         "summary_prev_bal_display_value": display_amount(context["summary_prev_bal_value"]),
-        "summary_balance_value": display_amount(amount_source.summary_balance) if amount_source else "",
+        "summary_balance_value": display_amount(summary_running["balance"]) if amount_source else "",
         "total_of_this_job_value": display_amount(amount_source.binding_total_of_this_job) if amount_source else "",
         "system_starting_amount_value": display_amount(context["system_value"].starting_amount),
         "first_job": first_job,

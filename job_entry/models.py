@@ -198,9 +198,7 @@ class PrintingJobSheet(models.Model):
             + self.printing_other_gst_price
             + self.printing_paper_amount
         )
-        previous_jobs = self.__class__.objects.all()
-        if self.pk:
-            previous_jobs = previous_jobs.exclude(pk=self.pk)
+        previous_jobs = self.__class__.objects.filter(job_no__lt=self.job_no)
         paper_vendor_jobs = previous_jobs.filter(paper_vendor=self.paper_vendor) if self.paper_vendor else previous_jobs.none()
         binding_vendor_jobs = (
             previous_jobs.filter(binding_vendor=self.binding_vendor) if self.binding_vendor else previous_jobs.none()
