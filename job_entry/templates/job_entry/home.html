@@ -795,7 +795,7 @@
 
             <div class="col-md-3">
                 <div class="input-group input-group-sm">
-                    <span class="input-group-text">Style</span>
+                    <span class="input-group-text">BDG Style</span>
                     <label for="job_style" class="visually-hidden-form-label">Style</label>
                     <input id="job_style_id_snapshot" name="job_style_id_snapshot" type="hidden" value="{{ current_job.job_style_id_snapshot|default_if_none:'' }}">
                     <select id="job_style" name="job_style" class="form-select">
@@ -1886,6 +1886,11 @@
             jobForm.addEventListener('keydown', function (event) {
                 const isEnter = event.key === 'Enter';
                 const isSaveUpdateButton = event.target && event.target.id === 'btn_update';
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    focusNextEditableField(event.target, true);
+                    return;
+                }
                 if (isEnter && !isSaveUpdateButton) {
                     event.preventDefault();
                 }
