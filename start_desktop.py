@@ -1,111 +1,125 @@
+import atexit
+import logging
 import os
 import socket
 import sys
 import threading
 import time
 import traceback
-import urllib.error
-import urllib.request
+import webbrowser
 from pathlib import Path
 
 
-LOG_FILE = None
+# 1. Environment & Logging Setup
+def app_log_dir():
+    root = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA") or str(Path.home())
+    path = Path(root) / "HarinamPress" / "HarinamPaper"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
-def app_data_dir():
-    root = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or str(Path.home())
-    data_dir = Path(root) / "HarinamPress" / "HarinamPaper"
-    data_dir.mkdir(parents=True, exist_ok=True)
-    return data_dir
+LOG_DIR = app_log_dir()
+logging.basicConfig(
+    filename=str(LOG_DIR / "server.log"),
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "harinam_paper.settings")
+
+import django
+
+django.setup()
+
+from django.core.management import call_command
+from waitress import serve
+from harinam_paper.backup import backup_database
+from harinam_paper.wsgi import application
+
+HOST = "127.0.0.1"
+PORT = 8000
+_backup_done = False
 
 
-def log(message):
-    if not LOG_FILE:
-        return
-    with LOG_FILE.open("a", encoding="utf-8") as file:
-        file.write("%s %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), message))
-
-
-def free_port():
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return sock.getsockname()[1]
-
-
-def wait_for_server(url, timeout=20):
-    last_error = ""
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        try:
-            urllib.request.urlopen(url, timeout=1).close()
-            return
-        except urllib.error.HTTPError as exc:
-            last_error = "HTTP %s: %s" % (exc.code, exc.read().decode("utf-8", errors="replace")[:1000])
-            log(last_error)
-        except Exception as exc:
-            last_error = repr(exc)
-            time.sleep(0.2)
-    raise RuntimeError("Harinam Paper server did not start. Last error: %s" % last_error)
-
-
-def prepare_django():
-    log("Preparing Django")
-    data_dir = app_data_dir()
-    os.environ.setdefault("HARINAM_PAPER_DATA_DIR", str(data_dir))
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "harinam_paper.settings")
-    log("Data dir: %s" % data_dir)
-    if getattr(sys, "frozen", False):
-        log("Frozen dir: %s" % getattr(sys, "_MEIPASS", ""))
-
-    import django
-    from django.core.management import call_command
-
-    django.setup()
-    call_command("migrate", interactive=False, verbosity=0)
-    if not getattr(sys, "frozen", False):
-        call_command("collectstatic", interactive=False, verbosity=0)
-
-
-def start_server(port):
+def show_error_popup(message):
     try:
-        log("Starting Waitress on port %s" % port)
-        from waitress import serve
-        from harinam_paper.wsgi import application
+        import tkinter
+        from tkinter import messagebox
 
-        serve(application, host="127.0.0.1", port=port, threads=8)
+        root = tkinter.Tk()
+        root.withdraw()
+        messagebox.showerror("Harinam Paper Error", message)
+        root.destroy()
+        return
     except Exception:
-        log(traceback.format_exc())
-        raise
+        pass
+
+    try:
+        import ctypes
+
+        ctypes.windll.user32.MessageBoxW(0, str(message), "Harinam Paper Error", 0x10)
+    except Exception:
+        pass
+
+
+def safe_backup_database():
+    global _backup_done
+    if _backup_done:
+        return
+    try:
+        backup_database()
+        _backup_done = True
+    except Exception:
+        log_path = LOG_DIR / "backup_error.log"
+        log_path.write_text(traceback.format_exc(), encoding="utf-8")
+
+
+def setup_database():
+    """Ensure database tables exist on fresh systems."""
+    try:
+        call_command("migrate", interactive=False)
+    except Exception:
+        log_path = LOG_DIR / "migration_error.log"
+        log_path.write_text(traceback.format_exc(), encoding="utf-8")
+
+
+def is_server_running(host, port):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        return s.connect_ex((host, port)) == 0
+
+
+def run_server():
+    serve(application, host=HOST, port=PORT, threads=4)
+
+
+def open_browser():
+    url = "http://%s:%s/" % (HOST, PORT)
+    for _ in range(40):
+        if is_server_running(HOST, PORT):
+            webbrowser.open(url)
+            return
+        time.sleep(0.3)
+    webbrowser.open(url)
 
 
 def main():
-    global LOG_FILE
-    LOG_FILE = app_data_dir() / "startup.log"
-    LOG_FILE.write_text("", encoding="utf-8")
-    log("Launching Harinam Paper")
+    # Pehle database ready karein
+    setup_database()
 
-    if getattr(sys, "frozen", False):
-        os.chdir(Path(sys.executable).resolve().parent)
-    else:
-        os.chdir(Path(__file__).resolve().parent)
-
-    try:
-        prepare_django()
-        port = free_port()
-        url = "http://127.0.0.1:%s/" % port
-        server_thread = threading.Thread(target=start_server, args=(port,), daemon=True)
-        server_thread.start()
-        wait_for_server(url)
-        log("Server is ready")
-
-        import webview
-
-        webview.create_window("Harinam Paper", url, width=1500, height=900, min_size=(1050, 700))
-        webview.start(debug=False)
-    except Exception:
-        log(traceback.format_exc())
-        raise
+    atexit.register(safe_backup_database)
+    threading.Thread(target=open_browser, daemon=True).start()
+    run_server()
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        safe_backup_database()
+    except Exception:
+        log_path = LOG_DIR / "startup.log"
+        log_path.write_text(traceback.format_exc(), encoding="utf-8")
+        show_error_popup("Application error hua hai. Detail yahan save hai:\n%s" % log_path)
+        safe_backup_database()
+        raise

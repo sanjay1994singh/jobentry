@@ -1,17 +1,26 @@
 from datetime import datetime
+from io import BytesIO
 from decimal import Decimal, InvalidOperation
+import os
+import threading
+import time
 
 from django.contrib import messages
+from django.core.mail import EmailMessage
 from django.db import IntegrityError
 from django.db import OperationalError, ProgrammingError
 from django.db.models import Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+from harinam_paper.backup import backup_database
 
 from .models import (
     BindingVendor,
@@ -99,6 +108,11 @@ def int_post(request, name):
 
 def optional_int_post(request, name):
     value = (request.POST.get(name) or "").strip()
+    return optional_int_value(value)
+
+
+def optional_int_value(value):
+    value = (value or "").strip()
     if not value:
         return None
     try:
@@ -109,6 +123,13 @@ def optional_int_post(request, name):
 
 def text_post(request, name):
     return (request.POST.get(name) or "").strip().upper()
+
+
+def selected_option_post(request, name):
+    value = text_post(request, name)
+    if not value or value.startswith("SELECT "):
+        return ""
+    return value
 
 
 def option_snapshot_post(request, model, name_field, id_field, current_id=None):
@@ -131,12 +152,20 @@ def date_post(request, name):
     value = text_post(request, name)
     if not value:
         return timezone.localdate()
+    parsed_date = date_filter_value(value)
+    return parsed_date or timezone.localdate()
+
+
+def date_filter_value(value):
+    value = (value or "").strip()
+    if not value:
+        return None
     for date_format in ("%d-%m-%Y", "%Y-%m-%d"):
         try:
             return datetime.strptime(value, date_format).date()
         except ValueError:
             pass
-    return timezone.localdate()
+    return None
 
 
 def display_date(value):
@@ -152,6 +181,10 @@ def display_amount(value, blank_zero=True):
         return ""
     rounded = Decimal(value).quantize(Decimal("1"))
     return str(rounded)
+
+
+def pdf_amount(value):
+    return display_amount(value, blank_zero=False)
 
 
 def vendor_account_totals(current_job=None):
@@ -355,6 +388,9 @@ def home(request, pk=None):
         if not has_printing_job_sheet_data(request):
             messages.error(request, "Blank form save nahi hoga. Pehle koi field fill karein.")
             return redirect("job_entry:job_edit", pk=current_job.pk) if current_job else redirect("job_entry:home")
+        if not selected_option_post(request, "paper_vendor") or not selected_option_post(request, "binding_vendor"):
+            messages.error(request, "Paper Vendor aur Binding Vendor select karein.")
+            return redirect("job_entry:job_edit", pk=current_job.pk) if current_job else redirect("job_entry:home")
         job = current_job or PrintingJobSheet()
         assign_printing_job_sheet(job, request)
         job.summary_prev_bal = running_summary_prev_for_job(job, system_value)
@@ -421,6 +457,17 @@ def home(request, pk=None):
         "has_next_job": bool(next_job),
     })
     return render(request, "job_entry/home.html", context)
+
+
+def app_exit(request):
+    backup_database()
+
+    def stop_process():
+        time.sleep(0.35)
+        os._exit(0)
+
+    threading.Thread(target=stop_process, daemon=True).start()
+    return JsonResponse({"ok": True})
 
 
 def option_groups():
@@ -564,8 +611,155 @@ def job_last(request):
     return redirect("job_entry:job_edit", pk=last_job.pk)
 
 
-def job_report_pdf(request):
+def build_job_sheet_pdf(job):
+    buffer = BytesIO()
+    page = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+
+    teal = colors.HexColor("#0f766e")
+    border = colors.HexColor("#0f766e")
+    label_color = colors.HexColor("#111827")
+    value_color = colors.HexColor("#111827")
+
+    def text_fit(value, max_chars=34):
+        value = str(value or "").upper()
+        return value if len(value) <= max_chars else value[:max_chars - 3] + "..."
+
+    def field(label, value, x, y, label_w=78, value_w=178, h=25, max_chars=34):
+        page.setStrokeColor(border)
+        page.setLineWidth(.8)
+        page.setFont("Helvetica-Bold", 10)
+        page.setFillColor(label_color)
+        page.drawString(x, y + 7, label.upper())
+        page.roundRect(x + label_w, y, value_w, h, 3, stroke=1, fill=0)
+        page.setFont("Helvetica", 10)
+        page.setFillColor(value_color)
+        page.drawString(x + label_w + 8, y + 7, text_fit(value, max_chars))
+
+    def underline_field(label, value, x, y, label_w=86, line_w=182, max_chars=32):
+        page.setStrokeColor(border)
+        page.setLineWidth(.8)
+        page.setFont("Helvetica-Bold", 10)
+        page.setFillColor(label_color)
+        page.drawString(x, y + 5, label.upper())
+        page.line(x + label_w, y + 3, x + label_w + line_w, y + 3)
+        page.setFont("Helvetica", 10)
+        page.drawString(x + label_w + 4, y + 7, text_fit(value, max_chars))
+
+    page.setStrokeColor(border)
+    page.setLineWidth(1.2)
+    page.roundRect(28, 26, width - 56, height - 52, 8, stroke=1, fill=0)
+    page.line(48, height - 96, width - 48, height - 96)
+
+    page.setFont("Helvetica-Bold", 22)
+    page.setFillColor(teal)
+    page.drawCentredString(width / 2, height - 70, "EMAIL Pub.")
+
+    left_x = 58
+    right_x = 318
+    y = height - 136
+    row_gap = 36
+
+    left_fields = [
+        ("JOB NO", job.job_no),
+        ("DATE", display_date(job.job_date)),
+        ("NAME", job.name),
+        ("SIZE", job.size),
+        ("PAGE", job.page),
+        ("COPIES", job.copies),
+        ("INK", job.ink),
+        ("S/S  F/B", job.ss_fb),
+        ("PLATES", pdf_amount(job.printing_plates_qty)),
+        ("PTG", pdf_amount(job.printing_ptg_qty)),
+        ("LAM/UV", job.printing_lam_uv),
+    ]
+    for index, (label, value) in enumerate(left_fields):
+        field(label, value, left_x, y - (index * row_gap), label_w=82, value_w=150, max_chars=25)
+
+    right_fields = [
+        ("QTY", job.paper_qty),
+        ("SIZE", job.paper_size),
+        ("QUALITY", job.paper_quality),
+        ("GSM", job.paper_gsm),
+        ("BDG STYLE", job.job_style),
+        ("OTHER", job.printing_other_gst),
+        ("GST", pdf_amount(job.printing_other_gst_price)),
+    ]
+    for index, (label, value) in enumerate(right_fields):
+        field(label, value, right_x, y - (index * row_gap), label_w=92, value_w=150, max_chars=25)
+
+    system_value = SystemValue.load()
+    summary_running = running_summary_balance_until(job, system_value)
+    payment_y = y - len(left_fields) * row_gap
+    payment_rows = [
+        ("PAID RS", pdf_amount(job.printing_paid_rs)),
+        ("DATE", display_date(job.printing_paid_date)),
+        ("REFERENCE", job.printing_reference),
+        ("THRU", job.printing_thru),
+        ("PREV BAL", pdf_amount(summary_running["prev"])),
+        ("BALANCE", pdf_amount(summary_running["balance"])),
+    ]
+    for index, (label, value) in enumerate(payment_rows):
+        field(label, value, left_x, payment_y - (index * row_gap), label_w=82, value_w=150, max_chars=25)
+
+    page.showPage()
+    page.save()
+    return buffer.getvalue()
+
+
+def job_sheet_pdf(request, pk):
+    job = get_object_or_404(PrintingJobSheet, pk=pk)
+    response = HttpResponse(build_job_sheet_pdf(job), content_type="application/pdf")
+    response["Content-Disposition"] = 'inline; filename="job-%s-sheet.pdf"' % job.job_no
+    return response
+
+
+def job_send_email(request, pk):
+    if request.method != "POST":
+        return redirect("job_entry:job_edit", pk=pk)
+
+    job = get_object_or_404(PrintingJobSheet, pk=pk)
+    system_value = SystemValue.load()
+    system_value.mail_from = text_post(request, "system_mail_from")
+    system_value.mail_to = text_post(request, "system_mail_to")
+    system_value.mail_cc = text_post(request, "system_mail_cc")
+    system_value.starting_amount = decimal_post(request, "system_starting_amount")
+    system_value.save()
+
+    if not system_value.mail_from or not system_value.mail_to:
+        messages.error(request, "MAIL FROM aur MAIL TO fill karein.")
+        return redirect("job_entry:job_edit", pk=job.pk)
+
+    to_emails = [email.strip() for email in system_value.mail_to.split(",") if email.strip()]
+    cc_emails = [email.strip() for email in system_value.mail_cc.split(",") if email.strip()]
+    pdf_bytes = build_job_sheet_pdf(job)
+    email = EmailMessage(
+        subject="Printing Job Sheet #%s" % job.job_no,
+        body="Printing Job Sheet #%s PDF attached hai." % job.job_no,
+        from_email=system_value.mail_from,
+        to=to_emails,
+        cc=cc_emails,
+    )
+    email.attach("job-%s-sheet.pdf" % job.job_no, pdf_bytes, "application/pdf")
+    try:
+        email.send(fail_silently=False)
+    except Exception as exc:
+        messages.error(request, "Email send nahi hua: %s" % exc)
+    else:
+        messages.success(request, "Job sheet PDF email successfully send ho gaya.")
+    return redirect("job_entry:job_edit", pk=job.pk)
+
+
+def report_jobs_and_section(request):
     query = (request.GET.get("q") or "").strip()
+    section = (request.GET.get("section") or "paper").strip().lower()
+    vendor = text_post(request, "vendor")
+    date_start = date_filter_value(request.GET.get("date_start"))
+    date_end = date_filter_value(request.GET.get("date_end"))
+    job_no_start = optional_int_value(request.GET.get("job_no_start"))
+    job_no_end = optional_int_value(request.GET.get("job_no_end"))
+    if section not in ("paper", "printing", "binding"):
+        section = "paper"
     jobs = PrintingJobSheet.objects.all()
     if query:
         filters = Q(name__icontains=query)
@@ -577,40 +771,140 @@ def job_report_pdf(request):
         except InvalidOperation:
             pass
         jobs = jobs.filter(filters)
+    if date_start:
+        jobs = jobs.filter(job_date__gte=date_start)
+    if date_end:
+        jobs = jobs.filter(job_date__lte=date_end)
+    if job_no_start is not None:
+        jobs = jobs.filter(job_no__gte=job_no_start)
+    if job_no_end is not None:
+        jobs = jobs.filter(job_no__lte=job_no_end)
+    if vendor and section == "paper":
+        jobs = jobs.filter(paper_vendor=vendor)
+    elif vendor and section == "binding":
+        jobs = jobs.filter(binding_vendor=vendor)
+    return jobs, {
+        "query": query,
+        "section": section,
+        "vendor": vendor,
+        "date_start": display_date(date_start) if date_start else "",
+        "date_end": display_date(date_end) if date_end else "",
+        "job_no_start": str(job_no_start) if job_no_start is not None else "",
+        "job_no_end": str(job_no_end) if job_no_end is not None else "",
+    }
 
+
+def report_rows_for_jobs(jobs, section):
+    rows = []
+    total_amount = Decimal("0")
+    total_paid = Decimal("0")
+    total_balance = Decimal("0")
+    system_value = SystemValue.load()
+    for job in jobs:
+        if section == "printing":
+            running = running_summary_balance_until(job, system_value)
+            total_rs = job.printing_total
+            paid_rs = job.printing_paid_rs
+            balance = running["balance"]
+        elif section == "binding":
+            vendor_totals = vendor_account_totals(job)
+            bill_base = vendor_total_decimal(vendor_totals, "binding", job.binding_vendor, "bill")
+            paid_base = vendor_total_decimal(vendor_totals, "binding", job.binding_vendor, "paid")
+            total_rs = job.binding_total_rs
+            paid_rs = paid_base + job.binding_paid_rs
+            balance = (bill_base + job.binding_total_rs) - paid_rs
+        else:
+            vendor_totals = vendor_account_totals(job)
+            bill_base = vendor_total_decimal(vendor_totals, "paper", job.paper_vendor, "bill")
+            paid_base = vendor_total_decimal(vendor_totals, "paper", job.paper_vendor, "paid")
+            total_rs = job.paper_total_rs
+            paid_rs = paid_base + job.paper_paid_amount
+            balance = (bill_base + job.paper_total_rs) - paid_rs
+
+        total_amount += total_rs
+        total_paid += paid_rs
+        total_balance += balance
+        rows.append({
+            "job_no": job.job_no,
+            "date": display_date(job.job_date),
+            "total_rs": pdf_amount(total_rs),
+            "paid_rs": pdf_amount(paid_rs),
+            "balance": pdf_amount(balance),
+        })
+    return rows, {
+        "total_rs": pdf_amount(total_amount),
+        "paid_rs": pdf_amount(total_paid),
+        "balance": pdf_amount(total_balance),
+    }
+
+
+def job_report(request):
+    jobs, filters = report_jobs_and_section(request)
+    section = filters["section"]
+    rows, totals = report_rows_for_jobs(jobs, section)
+    report_titles = {
+        "paper": "Paper Report",
+        "printing": "Printing Report",
+        "binding": "Binding Report",
+    }
+    return render(request, "job_entry/report.html", {
+        "rows": rows,
+        "totals": totals,
+        "filters": filters,
+        "query": filters["query"],
+        "section": section,
+        "report_title": report_titles[section],
+        "total_jobs": len(rows),
+        "paper_vendor_options": active_options(PaperVendor),
+        "binding_vendor_options": active_options(BindingVendor),
+    })
+
+
+def job_report_pdf(request):
+    query_string = request.META.get("QUERY_STRING", "")
+    target = reverse("job_entry:job_report")
+    return redirect("%s?%s" % (target, query_string) if query_string else target)
+
+
+def job_report_pdf_download(request):
+    jobs, filters = report_jobs_and_section(request)
+    section = filters["section"]
     response = HttpResponse(content_type="application/pdf")
     response["Content-Disposition"] = 'inline; filename="printing-job-report.pdf"'
 
     doc = SimpleDocTemplate(
         response,
-        pagesize=landscape(A4),
+        pagesize=A4,
         rightMargin=24,
         leftMargin=24,
         topMargin=24,
         bottomMargin=24,
     )
     styles = getSampleStyleSheet()
+    report_titles = {
+        "paper": "PAPER REPORT",
+        "printing": "PRINTING REPORT",
+        "binding": "BINDING REPORT",
+    }
     story = [
-        Paragraph("PRINTING JOB REPORT", styles["Title"]),
-        Paragraph("Search: %s" % (query or "All Jobs"), styles["Normal"]),
+        Paragraph(report_titles[section], styles["Title"]),
+        Paragraph("Search: %s" % (filters["query"] or "All Jobs"), styles["Normal"]),
         Spacer(1, 10),
     ]
 
-    rows = [["Job No", "Date", "Name", "Size", "Copies", "Printing", "Paper", "Binding", "Total Job"]]
-    for job in jobs[:500]:
+    rows = [["Job No", "Date", "Total Rs", "Paid Rs", "Balance"]]
+    report_rows, totals = report_rows_for_jobs(jobs[:500], section)
+    for row in report_rows:
         rows.append([
-            str(job.job_no),
-            display_date(job.job_date),
-            job.name or "",
-            job.size or "",
-            str(job.copies),
-            str(job.printing_total),
-            str(job.paper_total_rs),
-            str(job.binding_total_rs),
-            str(job.binding_total_of_this_job),
+            str(row["job_no"]),
+            row["date"],
+            row["total_rs"],
+            row["paid_rs"],
+            row["balance"],
         ])
+    rows.append(["", "TOTAL", totals["total_rs"], totals["paid_rs"], totals["balance"]])
 
-    table = Table(rows, repeatRows=1, colWidths=[45, 70, 160, 80, 55, 75, 75, 75, 85])
+    table = Table(rows, repeatRows=1, colWidths=[58, 78, 132, 132, 132])
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1f4f8f")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
@@ -619,7 +913,7 @@ def job_report_pdf(request):
         ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#b9c6d8")),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f4f7fb")]),
         ("ALIGN", (0, 0), (1, -1), "CENTER"),
-        ("ALIGN", (4, 1), (-1, -1), "RIGHT"),
+        ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
     ]))
     story.append(table)

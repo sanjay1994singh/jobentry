@@ -55,7 +55,11 @@
 
         .banner-printing { background-color: #2563eb; color: #fff; }
         .banner-paper { background-color: #059669; color: #fff; }
-        .banner-binding { background-color: #0d9488; color: #fff; }
+        .section-banner.banner-binding,
+        .job-card .section-banner.banner-binding {
+            background-color: #dc2626 !important;
+            color: #fff !important;
+        }
 
         /* ---------- Consistent form controls ---------- */
         .input-group,
@@ -761,7 +765,7 @@
 <body>
 
 <div class="container-fluid page-fluid">
-    <form id="printing_job_form" name="printing_job_form" class="card job-card bg-white p-4" method="post" autocomplete="off">
+    <form id="printing_job_form" name="printing_job_form" class="card job-card bg-white p-4" method="post" autocomplete="off" novalidate>
         {% csrf_token %}
 
         {% if messages %}
@@ -1099,7 +1103,7 @@
                         <span class="input-group-text">VENDOR</span>
                         <label for="paper_vendor" class="visually-hidden-form-label">Vendor</label>
                         <input id="paper_vendor_id_snapshot" name="paper_vendor_id_snapshot" type="hidden" value="{{ current_job.paper_vendor_id_snapshot|default_if_none:'' }}">
-                        <select id="paper_vendor" name="paper_vendor" class="form-select">
+                        <select id="paper_vendor" name="paper_vendor" class="form-select" required>
                             <option value="" {% if not current_job.paper_vendor %}selected{% endif %}>Select Vendor...</option>
                             {% if paper_vendor_saved_missing %}
                                 <option value="{{ current_job.paper_vendor }}" data-option-id="{{ current_job.paper_vendor_id_snapshot|default_if_none:'' }}" selected>{{ current_job.paper_vendor }}</option>
@@ -1163,7 +1167,7 @@
             <div class="col-lg-4 col-md-6">
                 <div class="form-block border rounded bg-light h-100 d-flex flex-column justify-content-between">
                     <div>
-                        <div class="section-banner banner-binding text-center">BINDING OUTSOURCE</div>
+                        <div class="section-banner banner-binding text-center" style="background-color: #dc2626 !important; color: #fff !important;">BINDING OUTSOURCE</div>
 
                         <div class="input-group input-group-sm field-row">
                             <span class="input-group-text">QTY</span>
@@ -1197,7 +1201,7 @@
                             <span class="input-group-text">VENDOR</span>
                             <label for="binding_vendor" class="visually-hidden-form-label">Binding Vendor</label>
                             <input id="binding_vendor_id_snapshot" name="binding_vendor_id_snapshot" type="hidden" value="{{ current_job.binding_vendor_id_snapshot|default_if_none:'' }}">
-                            <select id="binding_vendor" name="binding_vendor" class="form-select">
+                            <select id="binding_vendor" name="binding_vendor" class="form-select" required>
                                 <option value="" {% if not current_job.binding_vendor %}selected{% endif %}>Select Vendor...</option>
                                 {% if binding_vendor_saved_missing %}
                                     <option value="{{ current_job.binding_vendor }}" data-option-id="{{ current_job.binding_vendor_id_snapshot|default_if_none:'' }}" selected>{{ current_job.binding_vendor }}</option>
@@ -1308,10 +1312,7 @@
 
 
 
-            <button id="btn_top" name="btn_top" class="btn btn-sm btn-secondary px-3"
-                    type="button" {% if not first_job or current_job and current_job.pk == first_job.pk %}disabled{% endif %}>
-                <i class="bi bi-arrow-up me-1"></i>TOP
-            </button>
+
 
 
             <button id="btn_previous" name="btn_previous" class="btn btn-sm btn-secondary px-3"
@@ -1323,22 +1324,26 @@
                 NEXT<i class="bi bi-arrow-right ms-1"></i>
             </button>
 
+            <button id="btn_top" name="btn_top" class="btn btn-sm btn-secondary px-3"
+                    type="button" {% if not first_job or current_job and current_job.pk == first_job.pk %}disabled{% endif %}>
+                <i class="bi bi-arrow-up me-1"></i>TOP
+            </button>
+
             <button id="btn_bottom" name="btn_bottom" class="btn btn-sm btn-secondary px-3"
                     type="button" {% if not last_job or current_job and current_job.pk == last_job.pk %}disabled{% endif %}>
                 BOTTOM<i class="bi bi-arrow-down ms-1"></i>
             </button>
 
-            <button id="btn_list" name="btn_list" class="btn btn-sm btn-primary px-3 fw-bold" type="button">
-                <i class="bi bi-list me-1"></i>LIST
-            </button>
+
 
             <button id="btn_options" name="btn_options" class="btn btn-sm btn-primary px-3 fw-bold" type="button">
                 <i class="bi bi-gear me-1"></i>OPTIONS
             </button>
 
 
-
-
+             <button id="btn_list" name="btn_list" class="btn btn-sm btn-primary px-3 fw-bold" type="button">
+                <i class="bi bi-list me-1"></i>LIST
+            </button>
 
             <button id="btn_report" name="btn_report" class="btn btn-sm btn-info text-white px-3" type="button">
                 <i class="bi bi-file-earmark-bar-graph me-1">
@@ -1449,7 +1454,10 @@
                 }
                 if (event.key === 'Enter') {
                     event.preventDefault();
-                    openDatePicker();
+                    const isoValue = displayToIsoDate(field.value) || today;
+                    field.type = 'text';
+                    field.value = isoToDisplayDate(isoValue);
+                    focusNextEditableField(field, false);
                 }
             });
 
@@ -1684,7 +1692,7 @@
     function setupSelectKeyboardOpen() {
         document.querySelectorAll('select').forEach(function (select) {
             select.addEventListener('keydown', function (event) {
-                if (event.key !== 'Enter' && event.key !== ' ') {
+                if (event.key !== ' ') {
                     return;
                 }
                 event.preventDefault();
@@ -1886,6 +1894,7 @@
             'system_mail_cc',
             'system_starting_amount',
             'btn_system_send_email',
+            'btn_system_preview_pdf',
             'btn_system_save',
             'btn_system_cancel',
         ]);
@@ -1924,6 +1933,64 @@
         {% endif %}
     }
 
+    function selectedValue(selectId) {
+        const field = document.getElementById(selectId);
+        return field ? String(field.value || '').trim() : '';
+    }
+
+    function validateRequiredVendors() {
+        const paperVendor = document.getElementById('paper_vendor');
+        const bindingVendor = document.getElementById('binding_vendor');
+        if (!selectedValue('paper_vendor')) {
+            showCenterMessage('Paper Vendor select karein.', 'warning');
+            if (paperVendor) {
+                paperVendor.focus();
+            }
+            return false;
+        }
+        if (!selectedValue('binding_vendor')) {
+            showCenterMessage('Binding Vendor select karein.', 'warning');
+            if (bindingVendor) {
+                bindingVendor.focus();
+            }
+            return false;
+        }
+        return true;
+    }
+
+    function setupFieldKeyboardNavigation() {
+        const form = document.getElementById('printing_job_form');
+        if (!form) {
+            return;
+        }
+        const nextKeys = new Set(['Enter', 'PageDown', 'ArrowRight', 'ArrowDown']);
+        const previousKeys = new Set(['Escape', 'PageUp', 'ArrowLeft', 'ArrowUp']);
+        form.addEventListener('keydown', function (event) {
+            const target = event.target;
+            if (!target || target.closest('#systemValueModal')) {
+                return;
+            }
+            if (!target.matches('input, select, textarea, button')) {
+                return;
+            }
+            const isSaveUpdateButton = target.id === 'btn_update';
+            if (event.key === 'Enter' && isSaveUpdateButton) {
+                return;
+            }
+            if (nextKeys.has(event.key)) {
+                event.preventDefault();
+                event.stopPropagation();
+                focusNextEditableField(target, false);
+                return;
+            }
+            if (previousKeys.has(event.key)) {
+                event.preventDefault();
+                event.stopPropagation();
+                focusNextEditableField(target, true);
+            }
+        }, true);
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         const existingCenterMessages = document.querySelectorAll('#center_message_wrap .center-message');
         if (existingCenterMessages.length) {
@@ -1952,8 +2019,15 @@
         setupPaperCalculator();
         setupBindingCalculator();
         setupStartingAmountGuard();
+        setupFieldKeyboardNavigation();
         const jobForm = document.getElementById('printing_job_form');
         if (jobForm) {
+            jobForm.addEventListener('submit', function (event) {
+                if (!validateRequiredVendors()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+            });
             jobForm.addEventListener('keydown', function (event) {
                 const isEnter = event.key === 'Enter';
                 const isSaveUpdateButton = event.target && event.target.id === 'btn_update';
@@ -1962,10 +2036,29 @@
                     focusNextEditableField(event.target, true);
                     return;
                 }
+                if (event.key === 'PageUp') {
+                    event.preventDefault();
+                    focusNextEditableField(event.target, true);
+                    return;
+                }
+                if (event.key === 'PageDown' || (isEnter && !isSaveUpdateButton)) {
+                    event.preventDefault();
+                    focusNextEditableField(event.target, false);
+                    return;
+                }
                 if (isEnter && !isSaveUpdateButton) {
                     event.preventDefault();
                 }
             });
+        }
+        const saveUpdateButton = document.getElementById('btn_update');
+        if (saveUpdateButton) {
+            saveUpdateButton.addEventListener('click', function (event) {
+                if (!validateRequiredVendors()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+            }, true);
         }
         const newButton = document.getElementById('btn_new');
         if (newButton) {
@@ -2003,7 +2096,11 @@
         if (reportButton) {
             reportButton.addEventListener('click', function () {
                 const query = searchInput ? searchInput.value.trim() : "";
-                window.open("{% url 'job_entry:job_report_pdf' %}" + (query ? "?q=" + encodeURIComponent(query) : ""), "_blank");
+                const params = new URLSearchParams();
+                if (query) {
+                    params.set("q", query);
+                }
+                window.open("{% url 'job_entry:job_report' %}" + (params.toString() ? "?" + params.toString() : ""), "_blank");
             });
         }
         const topButton = document.getElementById('btn_top');
@@ -2043,6 +2140,18 @@
             startingAmount.addEventListener('blur', function () {
                 const value = parseFloat(String(startingAmount.value || '').replace(/[^0-9.-]/g, ''));
                 startingAmount.value = Number.isFinite(value) && value !== 0 ? String(Math.round(value)) : '';
+            });
+        }
+        const exitButton = document.getElementById('btn_exit');
+        if (exitButton) {
+            exitButton.addEventListener('click', function () {
+                fetch("{% url 'job_entry:app_exit' %}", { cache: 'no-store' })
+                    .finally(function () {
+                        window.close();
+                        setTimeout(function () {
+                            window.location.href = 'about:blank';
+                        }, 250);
+                    });
             });
         }
     });
@@ -2091,7 +2200,8 @@
                                id="system_mail_to"
                                name="system_mail_to"
                                value="{{ system_value.mail_to|default_if_none:'' }}"
-                               placeholder="Mail To">
+                               placeholder="Mail To"
+                               multiple>
                     </div>
 
                     <div class="input-group input-group-sm system-field">
@@ -2101,7 +2211,8 @@
                                id="system_mail_cc"
                                name="system_mail_cc"
                                value="{{ system_value.mail_cc|default_if_none:'' }}"
-                               placeholder="CC Email">
+                               placeholder="CC Email"
+                               multiple>
                     </div>
 
                     <div class="input-group input-group-sm system-field">
@@ -2125,9 +2236,31 @@
                         id="btn_system_send_email"
                         name="system_send_email_action"
                         value="1"
-                        form="system_value_form">
+                        form="system_value_form"
+                        {% if current_job %}
+                        formaction="{% url 'job_entry:job_send_email' current_job.pk %}"
+                        {% else %}
+                        disabled
+                        {% endif %}>
                     <i class="bi bi-floppy me-1"></i>SEND E-MAIL
                 </button>
+
+                {% if current_job %}
+                    <a class="btn btn-sm btn-info fw-bold text-white"
+                       id="btn_system_preview_pdf"
+                       href="{% url 'job_entry:job_sheet_pdf' current_job.pk %}"
+                       target="_blank"
+                       rel="noopener">
+                        <i class="bi bi-file-earmark-pdf me-1"></i>PREVIEW PDF
+                    </a>
+                {% else %}
+                    <button type="button"
+                            class="btn btn-sm btn-info fw-bold text-white"
+                            id="btn_system_preview_pdf"
+                            disabled>
+                        <i class="bi bi-file-earmark-pdf me-1"></i>PREVIEW PDF
+                    </button>
+                {% endif %}
 
 
                 <button type="submit"
