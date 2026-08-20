@@ -399,6 +399,10 @@
             background: #9333ea;
         }
 
+        #btn_backup {
+            background: #7f1d1d;
+        }
+
         #btn_new {
             background: #15803d;
         }
@@ -501,7 +505,7 @@
 
         /* SYSTEM VALUE popup */
         #systemValueModal .modal-dialog {
-            max-width: 470px;
+            max-width: 590px;
         }
 
         #systemValueModal .modal-content {
@@ -555,10 +559,17 @@
             padding: 9px 14px;
             gap: 6px;
             border-top: 1px solid #e2e8f0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
         }
 
         #systemValueModal .modal-footer .btn {
-            min-width: 86px;
+            min-width: 0;
+            width: 100%;
+            white-space: nowrap;
+            line-height: 1.15;
+            min-height: 38px;
+            font-size: .82rem;
         }
 
 
@@ -759,6 +770,18 @@
             pointer-events: auto;
         }
 
+        .center-confirm-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 12px;
+        }
+
+        .center-confirm-actions .btn {
+            min-width: 90px;
+            font-weight: 700;
+        }
+
     </style>
 
 </head>
@@ -788,7 +811,7 @@
                     <span class="input-group-text">Job No</span>
                     <label for="job_job_no" class="visually-hidden-form-label">Job No</label>
                     <input id="job_job_no" name="job_job_no" type="text" class="form-control fw-bold"
-                           value="{{ next_job_no }}" placeholder="Job No" readonly>
+                           value="{{ next_job_no }}" placeholder="Job No" {% if not can_edit_job_no %}readonly{% endif %}>
                 </div>
             </div>
             <div class="col-md-3">
@@ -1340,7 +1363,6 @@
                 <i class="bi bi-gear me-1"></i>OPTIONS
             </button>
 
-
              <button id="btn_list" name="btn_list" class="btn btn-sm btn-primary px-3 fw-bold" type="button">
                 <i class="bi bi-list me-1"></i>LIST
             </button>
@@ -1357,6 +1379,10 @@
                 <button id="btn_search" name="btn_search" class="btn btn-outline-primary" type="button"><i
                         class="bi bi-search"></i></button>
             </div>
+
+            <button id="btn_backup" name="btn_backup" class="btn btn-sm btn-primary px-3 fw-bold" type="button">
+                <i class="bi bi-database-down me-1"></i>BACKUP
+            </button>
             
             <button id="btn_exit" name="btn_exit" class="btn btn-sm btn-danger px-3 fw-bold" type="button">
                 <i class="bi bi-box-arrow-right me-1"></i>EXIT
@@ -1892,6 +1918,11 @@
             'system_mail_from',
             'system_mail_to',
             'system_mail_cc',
+            'system_smtp_host',
+            'system_smtp_port',
+            'system_smtp_use_tls',
+            'system_smtp_username',
+            'system_smtp_password',
             'system_starting_amount',
             'btn_system_send_email',
             'btn_system_preview_pdf',
@@ -2078,6 +2109,12 @@
                 window.open("{% url 'job_entry:options' %}", "_blank");
             });
         }
+        const backupButton = document.getElementById('btn_backup');
+        if (backupButton) {
+            backupButton.addEventListener('click', function () {
+                window.location.href = "{% url 'job_entry:backup' %}";
+            });
+        }
         const searchButton = document.getElementById('btn_search');
         const searchInput = document.getElementById('footer_total_of_this_job');
         if (searchButton && searchInput) {
@@ -2145,13 +2182,35 @@
         const exitButton = document.getElementById('btn_exit');
         if (exitButton) {
             exitButton.addEventListener('click', function () {
-                fetch("{% url 'job_entry:app_exit' %}", { cache: 'no-store' })
-                    .finally(function () {
-                        window.close();
-                        setTimeout(function () {
-                            window.location.href = 'about:blank';
-                        }, 250);
-                    });
+                let wrap = document.getElementById('center_message_wrap');
+                if (!wrap) {
+                    wrap = document.createElement('div');
+                    wrap.id = 'center_message_wrap';
+                    wrap.className = 'center-message-wrap';
+                    document.body.appendChild(wrap);
+                }
+                wrap.innerHTML = '';
+                const box = document.createElement('div');
+                box.className = 'alert alert-warning center-message';
+                box.setAttribute('role', 'alert');
+                box.innerHTML = '<div>Are you sure want to close?</div>' +
+                    '<div class="center-confirm-actions">' +
+                    '<button type="button" class="btn btn-sm btn-danger" id="confirm_exit_yes">YES</button>' +
+                    '<button type="button" class="btn btn-sm btn-secondary" id="confirm_exit_no">NO</button>' +
+                    '</div>';
+                wrap.appendChild(box);
+                document.getElementById('confirm_exit_no').addEventListener('click', function () {
+                    wrap.remove();
+                });
+                document.getElementById('confirm_exit_yes').addEventListener('click', function () {
+                    fetch("{% url 'job_entry:app_exit' %}", { cache: 'no-store' })
+                        .finally(function () {
+                            window.close();
+                            setTimeout(function () {
+                                window.location.href = 'about:blank';
+                            }, 250);
+                        });
+                });
             });
         }
     });
@@ -2213,6 +2272,53 @@
                                value="{{ system_value.mail_cc|default_if_none:'' }}"
                                placeholder="CC Email"
                                multiple>
+                    </div>
+
+                    <div class="input-group input-group-sm system-field">
+                        <label class="input-group-text" for="system_smtp_host">SMTP HOST</label>
+                        <input type="text"
+                               class="form-control"
+                               id="system_smtp_host"
+                               name="system_smtp_host"
+                               value="{{ system_value.smtp_host|default:'smtp.gmail.com' }}"
+                               placeholder="smtp.gmail.com">
+                    </div>
+
+                    <div class="input-group input-group-sm system-field">
+                        <label class="input-group-text" for="system_smtp_port">SMTP PORT</label>
+                        <input type="text"
+                               class="form-control js-amount-field"
+                               id="system_smtp_port"
+                               name="system_smtp_port"
+                               value="{{ system_value.smtp_port|default:'587' }}"
+                               placeholder="587">
+                        <label class="input-group-text" for="system_smtp_use_tls">TLS</label>
+                        <select class="form-select"
+                                id="system_smtp_use_tls"
+                                name="system_smtp_use_tls">
+                            <option value="1" {% if system_value.smtp_use_tls %}selected{% endif %}>YES</option>
+                            <option value="0" {% if not system_value.smtp_use_tls %}selected{% endif %}>NO</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group input-group-sm system-field">
+                        <label class="input-group-text" for="system_smtp_username">SMTP USER</label>
+                        <input type="text"
+                               class="form-control"
+                               id="system_smtp_username"
+                               name="system_smtp_username"
+                               value="{{ system_value.smtp_username|default_if_none:'' }}"
+                               placeholder="SMTP Username">
+                    </div>
+
+                    <div class="input-group input-group-sm system-field">
+                        <label class="input-group-text" for="system_smtp_password">APP PASSWORD</label>
+                        <input type="password"
+                               class="form-control"
+                               id="system_smtp_password"
+                               name="system_smtp_password"
+                               value=""
+                               placeholder="{% if system_value.smtp_password %}Saved password{% else %}App password{% endif %}">
                     </div>
 
                     <div class="input-group input-group-sm system-field">
@@ -2278,14 +2384,6 @@
                         name="btn_system_cancel"
                         data-bs-dismiss="modal">
                     <i class="bi bi-x-circle me-1"></i>CANCEL
-                </button>
-
-                <button type="button"
-                        class="btn btn-sm btn-danger fw-bold"
-                        id="btn_system_exit"
-                        name="btn_system_exit"
-                        data-bs-dismiss="modal">
-                    <i class="bi bi-box-arrow-right me-1"></i>EXIT
                 </button>
             </div>
 

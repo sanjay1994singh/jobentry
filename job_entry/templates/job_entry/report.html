@@ -65,7 +65,7 @@
         }
         .filter-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto;
+            grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr auto;
             gap: 8px;
             align-items: center;
         }
@@ -188,9 +188,12 @@
                     </select>
                 </div>
                 <div class="input-group input-group-sm">
-                    <span class="input-group-text">DATE</span>
-                    <input name="date_start" type="text" class="form-control" value="{{ filters.date_start }}" placeholder="Start">
-                    <input name="date_end" type="text" class="form-control" value="{{ filters.date_end }}" placeholder="End">
+                    <span class="input-group-text">START DATE</span>
+                    <input name="date_start" type="text" class="form-control report-date-field" value="{{ filters.date_start }}" placeholder="dd-mm-yyyy" maxlength="10">
+                </div>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text">END DATE</span>
+                    <input name="date_end" type="text" class="form-control report-date-field" value="{{ filters.date_end }}" placeholder="dd-mm-yyyy" maxlength="10">
                 </div>
                 <div class="input-group input-group-sm">
                     <span class="input-group-text">JOB NO</span>
@@ -250,6 +253,56 @@
     </main>
 </div>
 <script>
+    function todayDisplayDate() {
+        const now = new Date();
+        const dd = String(now.getDate()).padStart(2, '0');
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        return dd + '-' + mm + '-' + now.getFullYear();
+    }
+
+    function normalizeReportDate(value) {
+        const digits = String(value || '').replace(/\D/g, '').slice(0, 8);
+        if (digits.length <= 2) {
+            return digits;
+        }
+        if (digits.length <= 4) {
+            return digits.slice(0, 2) + '-' + digits.slice(2);
+        }
+        return digits.slice(0, 2) + '-' + digits.slice(2, 4) + '-' + digits.slice(4);
+    }
+
+    document.querySelectorAll('.report-date-field').forEach(function (field) {
+        if (!field.value) {
+            field.value = todayDisplayDate();
+        }
+        field.addEventListener('input', function (event) {
+            const oldValue = field.value;
+            const oldPos = field.selectionStart || oldValue.length;
+            const digitsBeforeCursor = oldValue.slice(0, oldPos).replace(/\D/g, '').length;
+            const formatted = normalizeReportDate(oldValue);
+            field.value = formatted;
+            let nextPos = 0;
+            let seenDigits = 0;
+            while (nextPos < formatted.length && seenDigits < digitsBeforeCursor) {
+                if (/\d/.test(formatted.charAt(nextPos))) {
+                    seenDigits += 1;
+                }
+                nextPos += 1;
+            }
+            if (event.inputType !== 'deleteContentBackward') {
+                while (formatted.charAt(nextPos) === '-') {
+                    nextPos += 1;
+                }
+            }
+            field.setSelectionRange(nextPos, nextPos);
+        });
+        field.addEventListener('blur', function () {
+            if (!field.value) {
+                field.value = todayDisplayDate();
+            }
+        });
+    });
+
     const sectionSelect = document.getElementById('section');
     if (sectionSelect) {
         sectionSelect.addEventListener('change', function () {

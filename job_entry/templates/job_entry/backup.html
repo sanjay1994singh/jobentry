@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backup & Restore</title>
+    <link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.css' %}">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #f0f2f5;
+            color: #1f2937;
+            font-family: "Segoe UI", system-ui, sans-serif;
+        }
+        .page {
+            padding: 14px;
+            min-height: 100vh;
+        }
+        .sheet {
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, .07);
+            padding: 18px;
+            min-height: calc(100vh - 28px);
+        }
+        .title {
+            margin: 0;
+            color: #163861;
+            font-size: 1.55rem;
+            font-weight: 800;
+            letter-spacing: .3px;
+        }
+        .top-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .top-actions .btn,
+        .side-actions .btn,
+        .backup-btn {
+            border: 0;
+            color: #fff;
+            font-weight: 800;
+            min-height: 36px;
+            border-radius: 6px;
+        }
+        .btn-home { background: #64748b; }
+        .btn-backup { background: #7f1d1d; }
+        .btn-download { background: #2563eb; }
+        .btn-restore { background: #dc2626; }
+        .main-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 330px;
+            gap: 18px;
+            margin-top: 16px;
+        }
+        .panel {
+            border: 1px solid #d7dee8;
+            border-radius: 8px;
+            background: #f8fafc;
+            padding: 16px;
+        }
+        .action-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }
+        .backup-card {
+            border: 1px solid #d7dee8;
+            border-radius: 8px;
+            background: #fff;
+            padding: 18px;
+            min-height: 250px;
+        }
+        h2 {
+            margin: 0 0 12px;
+            color: #0f2f55;
+            font-size: 1.35rem;
+            font-weight: 800;
+        }
+        .backup-card p {
+            margin: 0 0 24px;
+            color: #475569;
+            font-weight: 700;
+            line-height: 1.25;
+        }
+        .backup-btn {
+            display: block;
+            width: 100%;
+            padding: 9px 12px;
+            text-align: center;
+            text-decoration: none;
+        }
+        .file-input {
+            width: 100%;
+            height: 38px;
+            border: 1px solid #cbd5e1;
+            border-radius: 5px;
+            background: #fff;
+            padding: 6px 8px;
+            font-weight: 600;
+        }
+        .path-box {
+            margin-top: 16px;
+            border: 1px dashed #b8c6d8;
+            border-radius: 8px;
+            background: #f1f5f9;
+            padding: 14px;
+            color: #334155;
+            font-weight: 700;
+            word-break: break-word;
+        }
+        .recent-title {
+            margin: 18px 0 10px;
+            color: #0f2f55;
+            font-weight: 800;
+            font-size: 1.2rem;
+        }
+        .recent-list {
+            overflow: hidden;
+            border: 1px solid #d7dee8;
+            border-radius: 8px;
+            background: #fff;
+        }
+        .recent-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 100px 150px 58px;
+            gap: 10px;
+            padding: 9px 12px;
+            border-bottom: 1px solid #e2e8f0;
+            align-items: center;
+            font-weight: 650;
+        }
+        .recent-row:last-child { border-bottom: 0; }
+        .recent-row.head {
+            background: #1f4f8f;
+            color: #fff;
+            font-weight: 800;
+        }
+        .delete-backup-btn {
+            width: 42px;
+            height: 30px;
+            border: 0;
+            border-radius: 5px;
+            background: #dc2626;
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            font-size: 15px;
+            line-height: 1;
+            font-weight: 800;
+        }
+        .delete-backup-btn:hover {
+            filter: brightness(.94);
+        }
+        .delete-backup-btn .delete-fallback {
+            font-size: 18px;
+            line-height: 1;
+            margin-top: -1px;
+        }
+        .side-actions {
+            display: grid;
+            gap: 10px;
+        }
+        .side-actions .btn {
+            width: 100%;
+            padding: 9px;
+        }
+        .alert {
+            font-weight: 750;
+            border-radius: 8px;
+        }
+        .center-message-wrap {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 3000;
+            width: min(420px, calc(100vw - 32px));
+            pointer-events: none;
+        }
+        .center-message {
+            border: 0;
+            border-radius: 10px;
+            box-shadow: 0 18px 50px rgba(15, 23, 42, .28);
+            font-size: 1rem;
+            font-weight: 800;
+            text-align: center;
+            padding: 16px 18px;
+            margin-bottom: 10px;
+            pointer-events: auto;
+        }
+        @media (max-width: 992px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+            .side-panel {
+                order: -1;
+            }
+        }
+        @media (max-width: 700px) {
+            .page { padding: 8px; }
+            .sheet { padding: 12px; }
+            .action-grid,
+            .recent-row {
+                grid-template-columns: 1fr;
+            }
+            .top-actions {
+                justify-content: flex-start !important;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <div class="sheet">
+        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 flex-wrap gap-2">
+            <h1 class="title"><i class="bi bi-database-down me-2"></i>BACKUP & RESTORE</h1>
+            <div class="top-actions">
+                <a class="btn btn-home px-4" href="{% url 'job_entry:home' %}">
+                    <i class="bi bi-house me-1"></i>HOME
+                </a>
+            </div>
+        </div>
+
+        {% if messages %}
+            <div id="center_message_wrap" class="center-message-wrap">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags|default:'info' }} center-message" role="alert">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="main-grid">
+            <section class="panel">
+                <div class="action-grid">
+                    <div class="backup-card">
+                        <h2>Backup Now</h2>
+                        <p>Current database ki safe copy create hokar download hogi.</p>
+                        <a class="backup-btn btn-download" href="{% url 'job_entry:backup_download' %}">
+                            <i class="bi bi-download me-1"></i>Download Backup
+                        </a>
+                    </div>
+
+                    <div class="backup-card">
+                        <h2>Restore Backup</h2>
+                        <p>Restore se pehle current database ka safety backup automatically banega.</p>
+                        <form method="post" action="{% url 'job_entry:backup_restore' %}" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <label class="fw-bold mb-2 d-block" for="backup_file">Select .sqlite3 Backup File</label>
+                            <input class="file-input" id="backup_file" name="backup_file" type="file" accept=".sqlite3" required>
+                            <button class="backup-btn btn-restore mt-3" type="submit">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i>Restore Backup
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="path-box">
+                    <div>Database: {{ database_path }}</div>
+                    <div class="mt-2">Backup Folder: {{ backup_folder }}</div>
+                </div>
+
+                <div class="recent-title">Recent Backups</div>
+                <div class="recent-list">
+                    <div class="recent-row head">
+                        <div>File Name</div>
+                        <div>Size</div>
+                        <div>Date Time</div>
+                        <div></div>
+                    </div>
+                    {% for item in recent_backups %}
+                        <div class="recent-row">
+                            <div>{{ item.name }}</div>
+                            <div>{{ item.size_kb }} KB</div>
+                            <div>{{ item.modified|date:"d-m-Y h:i A" }}</div>
+                            <div class="text-center">
+                                <form method="post"
+                                      action="{% url 'job_entry:backup_delete' item.name %}"
+                                      onsubmit="return confirm('Ye backup delete karna hai?');">
+                                    {% csrf_token %}
+                                    <button class="delete-backup-btn" type="submit" title="Delete Backup">
+                                        <i class="bi bi-trash"></i>
+                                        <span class="delete-fallback">&times;</span>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="recent-row">
+                            <div>Abhi koi backup nahi hai.</div>
+                            <div></div>
+                            <div></div>
+                            <div></div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <aside class="panel side-panel">
+                <h2>Buttons</h2>
+                <div class="side-actions">
+                    <a class="btn btn-home" href="{% url 'job_entry:home' %}">HOME</a>
+                    <a class="btn btn-backup" href="{% url 'job_entry:backup_download' %}">BACKUP NOW</a>
+                </div>
+            </aside>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        setTimeout(function () {
+            const wrap = document.getElementById('center_message_wrap');
+            if (wrap) {
+                wrap.remove();
+            }
+        }, 2400);
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape') {
+            return;
+        }
+        event.preventDefault();
+        window.close();
+        setTimeout(function () {
+            if (!window.closed) {
+                window.location.href = "{% url 'job_entry:home' %}";
+            }
+        }, 150);
+    });
+</script>
+</body>
+</html>

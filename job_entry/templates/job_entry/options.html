@@ -36,6 +36,8 @@
         .btn-new { background: #16a34a; color: #fff; border: 0; }
         input[type="text"] { text-transform: uppercase; }
         .empty { color: #64748b; font-size: .85rem; padding: 8px 0; }
+        .center-message-wrap { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 3000; width: min(420px, calc(100vw - 32px)); pointer-events: none; }
+        .center-message { border: 0; border-radius: 10px; box-shadow: 0 18px 50px rgba(15,23,42,.28); font-size: 1rem; font-weight: 800; text-align: center; padding: 16px 18px; margin-bottom: 10px; pointer-events: auto; }
         @media (max-width: 1280px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         @media (max-width: 760px) {
             .page { padding: 8px; }
@@ -57,9 +59,9 @@
         </div>
 
         {% if messages %}
-            <div class="mb-2">
+            <div id="center_message_wrap" class="center-message-wrap">
                 {% for message in messages %}
-                    <div class="alert alert-{{ message.tags|default:'info' }} py-2 mb-2" role="alert">{{ message }}</div>
+                    <div class="alert alert-{{ message.tags|default:'info' }} center-message" role="alert">{{ message }}</div>
                 {% endfor %}
             </div>
         {% endif %}
@@ -105,6 +107,15 @@
     </div>
 </div>
 <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        setTimeout(function () {
+            const wrap = document.getElementById('center_message_wrap');
+            if (wrap) {
+                wrap.remove();
+            }
+        }, 2400);
+    });
+
     function notifyHomeOptionsChanged() {
         if (window.opener && !window.opener.closed) {
             window.opener.postMessage({ type: 'job-entry-options-changed' }, window.location.origin);

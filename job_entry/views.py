@@ -2,15 +2,17 @@ from datetime import datetime
 from io import BytesIO
 from decimal import Decimal, InvalidOperation
 import os
+from pathlib import Path
 import threading
 import time
 
 from django.contrib import messages
 from django.core.mail import EmailMessage
+from django.core.mail.backends.smtp import EmailBackend
 from django.db import IntegrityError
 from django.db import OperationalError, ProgrammingError
 from django.db.models import Q, Sum
-from django.http import HttpResponse, JsonResponse
+from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -20,7 +22,13 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from harinam_paper.backup import backup_database
+from harinam_paper.backup import (
+    backup_database,
+    backup_dir,
+    database_path,
+    recent_backups,
+    restore_database_from_file,
+)
 
 from .models import (
     BindingVendor,
@@ -104,6 +112,11 @@ def int_post(request, name):
         return int(Decimal(value.replace(",", "")))
     except (InvalidOperation, ValueError):
         return 0
+
+
+def positive_int_post(request, name, default=0):
+    value = int_post(request, name)
+    return value if value > 0 else default
 
 
 def optional_int_post(request, name):
@@ -380,6 +393,7 @@ def home(request, pk=None):
     seed_lookup_data()
     current_job = get_object_or_404(PrintingJobSheet, pk=pk) if pk else None
     system_value = SystemValue.load()
+    can_edit_job_no = not current_job and not PrintingJobSheet.objects.exists()
 
     if request.method == "POST":
         if not current_job and system_value.starting_amount == Decimal("0"):
@@ -392,6 +406,10 @@ def home(request, pk=None):
             messages.error(request, "Paper Vendor aur Binding Vendor select karein.")
             return redirect("job_entry:job_edit", pk=current_job.pk) if current_job else redirect("job_entry:home")
         job = current_job or PrintingJobSheet()
+        if can_edit_job_no:
+            manual_job_no = optional_int_post(request, "job_job_no")
+            if manual_job_no:
+                job.job_no = manual_job_no
         assign_printing_job_sheet(job, request)
         job.summary_prev_bal = running_summary_prev_for_job(job, system_value)
         job.save()
@@ -404,6 +422,7 @@ def home(request, pk=None):
     context = {
         "current_job": current_job,
         "next_job_no": current_job.job_no if current_job else PrintingJobSheet.next_job_no(),
+        "can_edit_job_no": can_edit_job_no,
         "job_date_value": display_date(current_job.job_date) if current_job else display_date(None),
         "printing_paid_date_value": display_date(current_job.printing_paid_date) if current_job else display_date(None),
         "paper_paid_date_value": display_date(current_job.paper_paid_date) if current_job else display_date(None),
@@ -460,14 +479,102 @@ def home(request, pk=None):
 
 
 def app_exit(request):
-    backup_database()
-
     def stop_process():
         time.sleep(0.35)
         os._exit(0)
 
     threading.Thread(target=stop_process, daemon=True).start()
     return JsonResponse({"ok": True})
+
+
+def backup_page(request):
+    backups = []
+    for backup_path in recent_backups():
+        stat = backup_path.stat()
+        backups.append({
+            "name": backup_path.name,
+            "size_kb": int((stat.st_size + 1023) / 1024),
+            "modified": datetime.fromtimestamp(stat.st_mtime),
+        })
+    return render(request, "job_entry/backup.html", {
+        "database_path": str(database_path()),
+        "backup_folder": str(backup_dir()),
+        "recent_backups": backups,
+    })
+
+
+def backup_download(request):
+    backup_path = backup_database()
+    if not backup_path:
+        messages.error(request, "Database file nahi mila, backup create nahi hua.")
+        return redirect("job_entry:backup")
+    response = FileResponse(open(str(backup_path), "rb"), as_attachment=True, filename=backup_path.name)
+    return response
+
+
+def backup_restore(request):
+    if request.method != "POST":
+        return redirect("job_entry:backup")
+
+    uploaded = request.FILES.get("backup_file")
+    if not uploaded:
+        messages.error(request, "Restore ke liye .sqlite3 backup file choose karein.")
+        return redirect("job_entry:backup")
+
+    if not uploaded.name.lower().endswith(".sqlite3"):
+        messages.error(request, "Sirf .sqlite3 backup file restore hogi.")
+        return redirect("job_entry:backup")
+
+    temp_path = backup_dir() / ("restore_upload_%s.sqlite3" % datetime.now().strftime("%Y%m%d_%H%M%S"))
+    try:
+        with open(str(temp_path), "wb") as handle:
+            for chunk in uploaded.chunks():
+                handle.write(chunk)
+        restore_database_from_file(temp_path)
+    except Exception as exc:
+        messages.error(request, "Restore nahi hua: %s" % exc)
+    else:
+        messages.success(request, "Backup successfully restore ho gaya.")
+    finally:
+        try:
+            Path(temp_path).unlink()
+        except Exception:
+            pass
+    return redirect("job_entry:backup")
+
+
+def backup_delete(request, filename):
+    if request.method != "POST":
+        return redirect("job_entry:backup")
+
+    safe_name = Path(filename).name
+    if safe_name != filename or not safe_name.lower().endswith(".sqlite3"):
+        messages.error(request, "Invalid backup file.")
+        return redirect("job_entry:backup")
+
+    target = backup_dir() / safe_name
+    try:
+        folder = backup_dir().resolve()
+        resolved_target = target.resolve()
+    except Exception:
+        messages.error(request, "Backup file path invalid hai.")
+        return redirect("job_entry:backup")
+
+    if folder not in resolved_target.parents or not resolved_target.exists():
+        messages.error(request, "Backup file nahi mila.")
+        return redirect("job_entry:backup")
+
+    try:
+        resolved_target.unlink()
+        for suffix in ("-wal", "-shm"):
+            sidecar = Path(str(resolved_target) + suffix)
+            if sidecar.exists():
+                sidecar.unlink()
+    except Exception as exc:
+        messages.error(request, "Backup delete nahi hua: %s" % exc)
+    else:
+        messages.success(request, "Backup deleted.")
+    return redirect("job_entry:backup")
 
 
 def option_groups():
@@ -545,6 +652,13 @@ def system_value_save(request):
     system_value.mail_from = text_post(request, "system_mail_from")
     system_value.mail_to = text_post(request, "system_mail_to")
     system_value.mail_cc = text_post(request, "system_mail_cc")
+    system_value.smtp_host = text_post(request, "system_smtp_host").lower()
+    system_value.smtp_port = positive_int_post(request, "system_smtp_port", 587)
+    system_value.smtp_username = (request.POST.get("system_smtp_username") or "").strip()
+    smtp_password = (request.POST.get("system_smtp_password") or "").strip()
+    if smtp_password:
+        system_value.smtp_password = smtp_password
+    system_value.smtp_use_tls = request.POST.get("system_smtp_use_tls") == "1"
     system_value.starting_amount = decimal_post(request, "system_starting_amount")
     system_value.save()
 
@@ -649,15 +763,10 @@ def build_job_sheet_pdf(job):
     page.setStrokeColor(border)
     page.setLineWidth(1.2)
     page.roundRect(28, 26, width - 56, height - 52, 8, stroke=1, fill=0)
-    page.line(48, height - 96, width - 48, height - 96)
-
-    page.setFont("Helvetica-Bold", 22)
-    page.setFillColor(teal)
-    page.drawCentredString(width / 2, height - 70, "EMAIL Pub.")
 
     left_x = 58
     right_x = 318
-    y = height - 136
+    y = height - 104
     row_gap = 36
 
     left_fields = [
@@ -676,14 +785,14 @@ def build_job_sheet_pdf(job):
     for index, (label, value) in enumerate(left_fields):
         field(label, value, left_x, y - (index * row_gap), label_w=82, value_w=150, max_chars=25)
 
+    page.setFont("Helvetica-Bold", 12)
+    page.setFillColor(teal)
+    page.drawString(right_x, y + 32, "PAPER")
     right_fields = [
         ("QTY", job.paper_qty),
         ("SIZE", job.paper_size),
         ("QUALITY", job.paper_quality),
         ("GSM", job.paper_gsm),
-        ("BDG STYLE", job.job_style),
-        ("OTHER", job.printing_other_gst),
-        ("GST", pdf_amount(job.printing_other_gst_price)),
     ]
     for index, (label, value) in enumerate(right_fields):
         field(label, value, right_x, y - (index * row_gap), label_w=92, value_w=150, max_chars=25)
@@ -701,6 +810,18 @@ def build_job_sheet_pdf(job):
     ]
     for index, (label, value) in enumerate(payment_rows):
         field(label, value, left_x, payment_y - (index * row_gap), label_w=82, value_w=150, max_chars=25)
+
+    page.setFont("Helvetica-Bold", 12)
+    page.setFillColor(teal)
+    binding_y = payment_y - (3 * row_gap)
+    page.drawString(right_x, binding_y + 32, "BINDING")
+    binding_rows = [
+        ("BDG STYLE", job.job_style),
+        ("OTHER/GST", job.printing_other_gst),
+        ("PAPER", job.printing_paper_details),
+    ]
+    for index, (label, value) in enumerate(binding_rows):
+        field(label, value, right_x, binding_y - (index * row_gap), label_w=92, value_w=150, max_chars=25)
 
     page.showPage()
     page.save()
@@ -723,22 +844,38 @@ def job_send_email(request, pk):
     system_value.mail_from = text_post(request, "system_mail_from")
     system_value.mail_to = text_post(request, "system_mail_to")
     system_value.mail_cc = text_post(request, "system_mail_cc")
+    system_value.smtp_host = text_post(request, "system_smtp_host").lower()
+    system_value.smtp_port = positive_int_post(request, "system_smtp_port", 587)
+    system_value.smtp_username = (request.POST.get("system_smtp_username") or "").strip()
+    smtp_password = (request.POST.get("system_smtp_password") or "").strip()
+    if smtp_password:
+        system_value.smtp_password = smtp_password
+    system_value.smtp_use_tls = request.POST.get("system_smtp_use_tls") == "1"
     system_value.starting_amount = decimal_post(request, "system_starting_amount")
     system_value.save()
 
-    if not system_value.mail_from or not system_value.mail_to:
-        messages.error(request, "MAIL FROM aur MAIL TO fill karein.")
+    if not system_value.mail_from or not system_value.mail_to or not system_value.smtp_host:
+        messages.error(request, "MAIL FROM, MAIL TO aur SMTP HOST fill karein.")
         return redirect("job_entry:job_edit", pk=job.pk)
 
     to_emails = [email.strip() for email in system_value.mail_to.split(",") if email.strip()]
     cc_emails = [email.strip() for email in system_value.mail_cc.split(",") if email.strip()]
     pdf_bytes = build_job_sheet_pdf(job)
+    connection = EmailBackend(
+        host=system_value.smtp_host,
+        port=system_value.smtp_port or 587,
+        username=system_value.smtp_username or system_value.mail_from,
+        password=system_value.smtp_password,
+        use_tls=system_value.smtp_use_tls,
+        timeout=20,
+    )
     email = EmailMessage(
         subject="Printing Job Sheet #%s" % job.job_no,
         body="Printing Job Sheet #%s PDF attached hai." % job.job_no,
         from_email=system_value.mail_from,
         to=to_emails,
         cc=cc_emails,
+        connection=connection,
     )
     email.attach("job-%s-sheet.pdf" % job.job_no, pdf_bytes, "application/pdf")
     try:
@@ -754,8 +891,8 @@ def report_jobs_and_section(request):
     query = (request.GET.get("q") or "").strip()
     section = (request.GET.get("section") or "paper").strip().lower()
     vendor = text_post(request, "vendor")
-    date_start = date_filter_value(request.GET.get("date_start"))
-    date_end = date_filter_value(request.GET.get("date_end"))
+    date_start = date_filter_value(request.GET.get("date_start")) or timezone.localdate()
+    date_end = date_filter_value(request.GET.get("date_end")) or timezone.localdate()
     job_no_start = optional_int_value(request.GET.get("job_no_start"))
     job_no_end = optional_int_value(request.GET.get("job_no_end"))
     if section not in ("paper", "printing", "binding"):

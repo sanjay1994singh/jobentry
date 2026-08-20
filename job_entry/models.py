@@ -79,6 +79,11 @@ class SystemValue(models.Model):
     mail_from = models.EmailField(max_length=254, blank=True)
     mail_to = models.EmailField(max_length=254, blank=True)
     mail_cc = models.EmailField(max_length=254, blank=True)
+    smtp_host = models.CharField(max_length=150, blank=True, default="smtp.gmail.com")
+    smtp_port = models.PositiveIntegerField(default=587)
+    smtp_username = models.CharField(max_length=254, blank=True)
+    smtp_password = models.CharField(max_length=254, blank=True)
+    smtp_use_tls = models.BooleanField(default=True)
     starting_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     updated_at = models.DateTimeField(auto_now=True)
 

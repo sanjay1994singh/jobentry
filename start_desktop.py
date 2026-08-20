@@ -1,4 +1,3 @@
-import atexit
 import logging
 import os
 import socket
@@ -33,12 +32,10 @@ django.setup()
 
 from django.core.management import call_command
 from waitress import serve
-from harinam_paper.backup import backup_database
 from harinam_paper.wsgi import application
 
 HOST = "127.0.0.1"
 PORT = 8000
-_backup_done = False
 
 
 def show_error_popup(message):
@@ -60,18 +57,6 @@ def show_error_popup(message):
         ctypes.windll.user32.MessageBoxW(0, str(message), "Harinam Paper Error", 0x10)
     except Exception:
         pass
-
-
-def safe_backup_database():
-    global _backup_done
-    if _backup_done:
-        return
-    try:
-        backup_database()
-        _backup_done = True
-    except Exception:
-        log_path = LOG_DIR / "backup_error.log"
-        log_path.write_text(traceback.format_exc(), encoding="utf-8")
 
 
 def setup_database():
@@ -107,7 +92,6 @@ def main():
     # Pehle database ready karein
     setup_database()
 
-    atexit.register(safe_backup_database)
     threading.Thread(target=open_browser, daemon=True).start()
     run_server()
 
@@ -116,10 +100,9 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        safe_backup_database()
+        pass
     except Exception:
         log_path = LOG_DIR / "startup.log"
         log_path.write_text(traceback.format_exc(), encoding="utf-8")
         show_error_popup("Application error hua hai. Detail yahan save hai:\n%s" % log_path)
-        safe_backup_database()
         raise
